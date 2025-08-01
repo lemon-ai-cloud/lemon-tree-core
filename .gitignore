@@ -1,0 +1,65 @@
+# .gitignore - Git 版本控制忽略文件配置
+# 指定不需要被 Git 跟踪的文件和目录
+
+# 二进制文件
+# 编译生成的可执行文件
+lemon-tree-core
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 测试二进制文件
+# Go 测试生成的文件
+*.test
+
+# 覆盖率文件
+# Go 测试覆盖率报告文件
+*.out
+
+# 依赖目录
+# Go 模块依赖目录
+vendor/
+
+# IDE 文件
+# 各种 IDE 的配置文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+# 操作系统生成的文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 日志文件
+# 应用程序生成的日志文件
+*.log
+
+# 环境变量文件
+# 包含敏感信息的环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+# 临时文件和目录
+tmp/
+temp/
+
+# 数据库文件
+# 本地数据库文件
+*.db
+*.sqlite
+
+# 配置文件（可选，根据项目需要）
+# 如果配置文件包含敏感信息，可以取消注释
+# config/config.yaml 

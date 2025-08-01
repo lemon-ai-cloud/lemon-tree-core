@@ -1,0 +1,51 @@
+# docker-compose.yml - 本地开发环境配置
+# 定义应用程序和数据库服务的容器编排
+
+# 指定 Docker Compose 文件格式版本
+version: '3.8'
+
+# 定义服务
+services:
+  # 应用程序服务
+  app:
+    build: .  # 使用当前目录的 Dockerfile 构建镜像
+    ports:
+      - "8080:8080"  # 端口映射：主机端口:容器端口
+    environment:
+      # 数据库连接环境变量
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=password
+      - DB_DATABASE=lemon_tree_core
+    depends_on:
+      - mysql  # 依赖 MySQL 服务，确保 MySQL 先启动
+    volumes:
+      - ./config:/root/config  # 挂载配置文件目录
+    networks:
+      - lemon-ai-network  # 连接到自定义网络
+
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0  # 使用 MySQL 8.0 官方镜像
+    environment:
+      # MySQL 环境变量配置
+      MYSQL_ROOT_PASSWORD: password      # root 用户密码
+      MYSQL_DATABASE: lemon_tree_core   # 数据库名称
+      MYSQL_CHARSET: utf8mb4            # 字符集
+      MYSQL_COLLATION: utf8mb4_unicode_ci  # 排序规则
+    ports:
+      - "3306:3306"  # 端口映射：主机端口:容器端口
+    volumes:
+      - mysql_data:/var/lib/mysql  # 挂载数据卷，持久化数据
+    networks:
+      - lemon-ai-network  # 连接到自定义网络
+
+# 定义数据卷
+volumes:
+  mysql_data:  # MySQL 数据持久化卷
+
+# 定义网络
+networks:
+  lemon-ai-network:  # 自定义网络，用于服务间通信
+    driver: bridge   # 使用桥接网络驱动 
