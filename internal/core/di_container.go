@@ -59,8 +59,8 @@ func NewContainer() *fx.App {
 		// 包含所有业务逻辑层的组件
 		fx.Provide(
 			service.NewApplicationService, // 创建 Application Service
+			service.NewUserService,        // 创建 User Service
 			// 未来可以在这里添加更多 Service
-			// service.NewUserService,
 			// service.NewOrderService,
 		),
 
@@ -68,8 +68,8 @@ func NewContainer() *fx.App {
 		// 包含所有 HTTP 请求处理层的组件
 		fx.Provide(
 			handler.NewApplicationHandler, // 创建 Application Handler
+			handler.NewUserHandler,        // 创建 User Handler
 			// 未来可以在这里添加更多 Handler
-			// handler.NewUserHandler,
 			// handler.NewOrderHandler,
 		),
 

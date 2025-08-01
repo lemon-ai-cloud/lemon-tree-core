@@ -14,10 +14,8 @@ import (
 // 定义了 Application 相关的所有业务操作接口
 // 包含业务规则验证和数据处理逻辑
 type ApplicationService interface {
-	CreateApplication(ctx context.Context, application *models.Application) error                    // 创建应用
 	GetApplicationByID(ctx context.Context, id uuid.UUID) (*models.Application, error)               // 根据ID获取应用
 	GetAllApplications(ctx context.Context) ([]*models.Application, error)                           // 获取所有应用
-	UpdateApplication(ctx context.Context, application *models.Application) error                    // 更新应用
 	SaveApplication(ctx context.Context, application *models.Application) error                      // 保存应用（upsert）
 	DeleteApplication(ctx context.Context, id uuid.UUID) error                                       // 删除应用
 	QueryApplications(ctx context.Context, query *models.Application) ([]*models.Application, error) // 动态查询应用
@@ -39,16 +37,6 @@ func NewApplicationService(appRepo repository.ApplicationRepository) Application
 	}
 }
 
-// CreateApplication 创建应用
-// 处理创建应用的业务逻辑，包括数据验证和持久化
-// 参数：ctx - 上下文，application - 要创建的应用对象
-// 返回：错误信息
-func (s *applicationService) CreateApplication(ctx context.Context, application *models.Application) error {
-	// 这里可以添加业务规则验证逻辑
-	// 例如：检查应用名称是否重复、验证 API Key 格式等
-	return s.appRepo.Create(ctx, application)
-}
-
 // GetApplicationByID 根据ID获取应用
 // 根据 UUID 获取指定的应用信息
 // 参数：ctx - 上下文，id - 应用的 UUID
@@ -63,16 +51,6 @@ func (s *applicationService) GetApplicationByID(ctx context.Context, id uuid.UUI
 // 返回：应用列表和错误信息
 func (s *applicationService) GetAllApplications(ctx context.Context) ([]*models.Application, error) {
 	return s.appRepo.ListAll(ctx)
-}
-
-// UpdateApplication 更新应用
-// 处理更新应用的业务逻辑，包括数据验证和持久化
-// 参数：ctx - 上下文，application - 要更新的应用对象
-// 返回：错误信息
-func (s *applicationService) UpdateApplication(ctx context.Context, application *models.Application) error {
-	// 这里可以添加业务规则验证逻辑
-	// 例如：检查应用是否存在、验证更新权限等
-	return s.appRepo.Update(ctx, application)
 }
 
 // SaveApplication 保存应用（upsert）

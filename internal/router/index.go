@@ -3,27 +3,33 @@
 package router
 
 import (
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"lemon-tree-core/internal/handler"
 	middleware2 "lemon-tree-core/internal/middleware"
+	"lemon-tree-core/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // RouterManager 路由管理器
 // 负责管理所有路由的配置和中间件
 // 提供统一的路由设置接口
 type RouterManager struct {
-	appHandler *handler.ApplicationHandler // Application 处理器
-	logger     *zap.Logger                 // 日志记录器
+	appHandler  *handler.ApplicationHandler // Application 处理器
+	userHandler *handler.UserHandler        // User 处理器
+	userService service.UserService         // User 服务
+	logger      *zap.Logger                 // 日志记录器
 }
 
 // NewRouterManager 创建路由管理器实例
 // 返回 RouterManager 的实例
-// 参数：appHandler - Application 处理器，logger - 日志记录器
-func NewRouterManager(appHandler *handler.ApplicationHandler, logger *zap.Logger) *RouterManager {
+// 参数：appHandler - Application 处理器，userHandler - User 处理器，userService - User 服务，logger - 日志记录器
+func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
 	return &RouterManager{
-		appHandler: appHandler,
-		logger:     logger,
+		appHandler:  appHandler,
+		userHandler: userHandler,
+		userService: userService,
+		logger:      logger,
 	}
 }
 
@@ -48,10 +54,12 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 	{
 		// 注册各个模块的路由
 		// 设置 Application 模块的路由
-		SetupApplicationRoutes(api, rm.appHandler)
+		SetupApplicationRoutes(api, rm.appHandler, rm.userService)
+
+		// 设置 User 模块的路由
+		SetupUserRoutes(api, rm.userHandler, rm.userService)
 
 		// 未来可以在这里添加更多模块的路由
-		// SetupUserRoutes(api, userHandler)
 		// SetupAuthRoutes(api, authHandler)
 	}
 

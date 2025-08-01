@@ -27,27 +27,6 @@ func NewApplicationHandler(appService service.ApplicationService) *ApplicationHa
 	}
 }
 
-// CreateApplication 创建应用
-// 处理 POST /api/v1/applications 请求
-// 创建新的应用并返回创建结果
-func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
-	// 绑定 JSON 请求体到 Application 结构体
-	var application models.Application
-	if err := c.ShouldBindJSON(&application); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 调用业务逻辑层创建应用
-	if err := h.appService.CreateApplication(c.Request.Context(), &application); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 返回创建成功的响应
-	c.JSON(http.StatusCreated, application)
-}
-
 // GetApplicationByID 根据ID获取应用
 // 处理 GET /api/v1/applications/:id 请求
 // 根据 UUID 获取指定的应用信息
@@ -86,40 +65,6 @@ func (h *ApplicationHandler) GetAllApplications(c *gin.Context) {
 
 	// 返回应用列表
 	c.JSON(http.StatusOK, applications)
-}
-
-// UpdateApplication 更新应用
-// 处理 PUT /api/v1/applications/:id 请求
-// 更新指定应用的信息
-func (h *ApplicationHandler) UpdateApplication(c *gin.Context) {
-	// 从 URL 参数中获取 ID
-	idStr := c.Param("id")
-
-	// 解析 UUID 格式的 ID
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid UUID format"})
-		return
-	}
-
-	// 绑定 JSON 请求体到 Application 结构体
-	var application models.Application
-	if err := c.ShouldBindJSON(&application); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 设置应用 ID
-	application.ID = id
-
-	// 调用业务逻辑层更新应用
-	if err := h.appService.UpdateApplication(c.Request.Context(), &application); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 返回更新后的应用信息
-	c.JSON(http.StatusOK, application)
 }
 
 // SaveApplication 保存应用（upsert）
