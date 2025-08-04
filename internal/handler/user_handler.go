@@ -3,8 +3,10 @@
 package handler
 
 import (
-	"lemon-tree-core/internal/models"
+	"lemon-tree-core/internal/converter"
+	"lemon-tree-core/internal/dto"
 	"lemon-tree-core/internal/service"
+	"lemon-tree-core/internal/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -31,10 +33,7 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 // 验证用户账号密码，创建会话并返回Token
 func (h *UserHandler) Login(c *gin.Context) {
 	// 绑定登录请求参数
-	var loginRequest struct {
-		Number   string `json:"number" binding:"required"`
-		Password string `json:"password" binding:"required"`
-	}
+	var loginRequest dto.SystemUserLoginDto
 
 	if err := c.ShouldBindJSON(&loginRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
@@ -48,12 +47,9 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// 返回登录成功响应
-	c.JSON(http.StatusOK, gin.H{
-		"message": "登录成功",
-		"user":    user,
-		"token":   token,
-	})
+	// 转换为DTO返回
+	userDto := converter.SystemUserModelToSystemUserDto(user)
+	utils.JsonResponse(c, http.StatusOK, gin.H{"user": userDto, "token": token})
 }
 
 // SaveUser 保存用户（创建或更新）
@@ -61,22 +57,25 @@ func (h *UserHandler) Login(c *gin.Context) {
 // 如果用户存在则更新，不存在则创建
 func (h *UserHandler) SaveUser(c *gin.Context) {
 	// 绑定用户信息
-	var user models.SystemUser
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var userSaveDto dto.SystemUserSaveDto
+	if err := c.ShouldBindJSON(&userSaveDto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
 		return
 	}
 
+	// 转换为模型
+	user := converter.SystemUserSaveDtoToSystemUserModel(&userSaveDto)
+
 	// 调用业务逻辑层保存用户
-	if err := h.userService.SaveUser(c.Request.Context(), &user); err != nil {
+	if err := h.userService.SaveUser(c.Request.Context(), user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 返回保存成功的响应
+	// 转换为DTO返回
+	userDto := converter.SystemUserModelToSystemUserDto(user)
 	c.JSON(http.StatusOK, gin.H{
-		"message": "用户保存成功",
-		"user":    user,
+		"user": userDto,
 	})
 }
 
@@ -91,9 +90,10 @@ func (h *UserHandler) GetAllUsers(c *gin.Context) {
 		return
 	}
 
-	// 返回用户列表
+	// 转换为DTO列表返回
+	userDtos := converter.SystemUserModelListToSystemUserDtoList(users)
 	c.JSON(http.StatusOK, gin.H{
-		"users": users,
+		"users": userDtos,
 	})
 }
 
@@ -118,9 +118,10 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 		return
 	}
 
-	// 返回用户信息
+	// 转换为DTO返回
+	userDto := converter.SystemUserModelToSystemUserDto(user)
 	c.JSON(http.StatusOK, gin.H{
-		"user": user,
+		"user": userDto,
 	})
 }
 
@@ -128,28 +129,17 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 // 处理 GET /api/v1/users/current 请求
 // 根据Token获取当前登录用户信息
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
-	// 从请求头中获取Token
-	token := c.GetHeader("Authorization")
-	if token == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "缺少认证Token"})
-		return
-	}
-
-	// 移除Bearer前缀（如果存在）
-	if len(token) > 7 && token[:7] == "Bearer " {
-		token = token[7:]
-	}
-
 	// 调用业务逻辑层获取当前用户
-	user, err := h.userService.GetCurrentUser(c.Request.Context(), token)
+	user, err := h.userService.GetCurrentUser(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 返回当前用户信息
+	// 转换为DTO返回
+	userDto := converter.SystemUserModelToSystemUserDto(user)
 	c.JSON(http.StatusOK, gin.H{
-		"user": user,
+		"user": userDto,
 	})
 }
 
@@ -177,6 +167,6 @@ func (h *UserHandler) Logout(c *gin.Context) {
 
 	// 返回登出成功的响应
 	c.JSON(http.StatusOK, gin.H{
-		"message": "登出成功",
+		"message": "success",
 	})
 }

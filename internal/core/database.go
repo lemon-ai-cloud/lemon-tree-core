@@ -59,7 +59,7 @@ func NewDatabase(config *config.Config) (*gorm.DB, error) {
 		&models.Application{},                            // 应用表
 		&models.SystemUser{},                             // 系统用户表
 		&models.SystemUserSession{},                      // 系统用户会话表
-		&models.ApplicationModel{},                       // 应用模型表
+		&models.ApplicationLlm{},                         // 应用模型表
 		&models.ChatAgent{},                              // 聊天智能体表
 		&models.ChatAgentConversation{},                  // 聊天智能体会话表
 		&models.ChatAgentMessage{},                       // 聊天智能体消息表

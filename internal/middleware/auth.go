@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"context"
 	"lemon-tree-core/internal/define"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/service"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+type myKey string
 
 // AuthMiddleware 认证中间件
 // 验证请求中的Token，确保用户已登录
@@ -31,7 +34,7 @@ func AuthMiddleware(userService service.UserService) gin.HandlerFunc {
 		}
 
 		// 验证Token并获取当前用户
-		user, err := userService.GetCurrentUser(c.Request.Context(), token)
+		user, err := userService.GetUserByToken(c.Request.Context(), token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
@@ -40,7 +43,9 @@ func AuthMiddleware(userService service.UserService) gin.HandlerFunc {
 
 		// 将用户信息存储到上下文中，供后续处理器使用
 		c.Set(define.AppContextKeyCurrentUser, user)
-
+		ctx := c.Request.Context()
+		ctx = context.WithValue(ctx, define.AppContextKeyCurrentUser, user)
+		c.Request = c.Request.WithContext(ctx)
 		// 继续处理下一个中间件或路由处理器
 		c.Next()
 	}
@@ -66,7 +71,7 @@ func OptionalAuthMiddleware(userService service.UserService) gin.HandlerFunc {
 		}
 
 		// 验证Token并获取当前用户
-		user, err := userService.GetCurrentUser(c.Request.Context(), token)
+		user, err := userService.GetUserByToken(c.Request.Context(), token)
 		if err != nil {
 			// Token无效，但不中断请求，继续处理
 			c.Next()

@@ -38,7 +38,7 @@ func NewContainer() *fx.App {
 			repository.NewApplicationRepository,                            // 创建 Application Repository
 			repository.NewSystemUserRepository,                             // 创建 SystemUser Repository
 			repository.NewSystemUserSessionRepository,                      // 创建 SystemUserSession Repository
-			repository.NewApplicationModelRepository,                       // 创建 ApplicationModel Repository
+			repository.NewApplicationLlmRepository,                         // 创建 ApplicationLlm Repository
 			repository.NewChatAgentRepository,                              // 创建 ChatAgent Repository
 			repository.NewChatAgentConversationRepository,                  // 创建 ChatAgentConversation Repository
 			repository.NewChatAgentMessageRepository,                       // 创建 ChatAgentMessage Repository

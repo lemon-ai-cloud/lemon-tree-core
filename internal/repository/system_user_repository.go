@@ -38,12 +38,12 @@ func NewSystemUserRepository(db *gorm.DB) SystemUserRepository {
 }
 
 // GetByNumber 根据用户账号获取用户
-// 根据用户账号查找并返回指定的用户信息
+// 根据用户账号查找并返回指定的用户信息（排除已删除的）
 // 参数：ctx - 上下文，number - 用户账号
 // 返回：用户对象和错误信息
 func (r *systemUserRepository) GetByNumber(ctx context.Context, number string) (*models.SystemUser, error) {
 	var user models.SystemUser
-	err := r.db.WithContext(ctx).Where("number = ?", number).First(&user).Error
+	err := r.db.WithContext(ctx).Where("number = ? AND deleted_at IS NULL", number).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -51,12 +51,12 @@ func (r *systemUserRepository) GetByNumber(ctx context.Context, number string) (
 }
 
 // GetByEmail 根据邮箱获取用户
-// 根据用户邮箱查找并返回指定的用户信息
+// 根据用户邮箱查找并返回指定的用户信息（排除已删除的）
 // 参数：ctx - 上下文，email - 用户邮箱
 // 返回：用户对象和错误信息
 func (r *systemUserRepository) GetByEmail(ctx context.Context, email string) (*models.SystemUser, error) {
 	var user models.SystemUser
-	err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
+	err := r.db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", email).First(&user).Error
 	if err != nil {
 		return nil, err
 	}

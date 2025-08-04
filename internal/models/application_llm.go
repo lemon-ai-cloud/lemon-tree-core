@@ -6,9 +6,9 @@ import (
 	"lemon-tree-core/internal/base"
 )
 
-// ApplicationModel 应用模型
+// ApplicationLlm 应用模型
 // 记录当前应用从模型提供商中选择确认使用的模型
-type ApplicationModel struct {
+type ApplicationLlm struct {
 	base.BaseModel           // 继承基础模型，包含 ID、时间戳等通用字段
 	Name           string    `json:"name" gorm:"type:varchar(64);not null;comment:模型名称"`
 	Alias          string    `json:"alias" gorm:"type:varchar(64);not null;comment:模型别名"`
@@ -29,6 +29,6 @@ type ApplicationModel struct {
 
 // TableName 指定数据库表名
 // 返回该模型对应的数据库表名
-func (ApplicationModel) TableName() string {
-	return "ltc_application_model"
+func (ApplicationLlm) TableName() string {
+	return "ltc_application_llm"
 }

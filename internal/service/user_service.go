@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"lemon-tree-core/internal/define"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/repository"
 	"time"
@@ -22,7 +23,8 @@ type UserService interface {
 	SaveUser(ctx context.Context, user *models.SystemUser) error                            // 保存用户（创建或更新）
 	GetAllUsers(ctx context.Context) ([]*models.SystemUser, error)                          // 获取所有用户
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.SystemUser, error)              // 根据ID获取用户详情
-	GetCurrentUser(ctx context.Context, token string) (*models.SystemUser, error)           // 根据Token获取当前登录用户
+	GetUserByToken(ctx context.Context, token string) (*models.SystemUser, error)           // 根据Token获取当前登录用户
+	GetCurrentUser(ctx context.Context) (*models.SystemUser, error)                         // 获取当前登录用户
 	Logout(ctx context.Context, token string) error                                         // 用户登出
 }
 
@@ -107,18 +109,46 @@ func (s *userService) SaveUser(ctx context.Context, user *models.SystemUser) err
 		if err != nil {
 			return fmt.Errorf("用户不存在: %w", err)
 		}
-		// 保留原有密码和盐值（如果新用户对象中没有提供）
-		if user.Password == "" {
-			user.Password = existingUser.Password
-		} else {
-			// 如果提供了新密码，需要加密
-			user.Password = hashPassword(user.Password, existingUser.PasswordSalt)
+
+		// 验证Number唯一性（如果Number发生变化）
+		if existingUser.Number != user.Number {
+			if _, err := s.userRepo.GetByNumber(ctx, user.Number); err == nil {
+				return fmt.Errorf("用户账号已存在")
+			}
 		}
-		if user.PasswordSalt == "" {
-			user.PasswordSalt = existingUser.PasswordSalt
+
+		// 验证Email唯一性（如果Email发生变化）
+		if existingUser.Email != user.Email {
+			if _, err := s.userRepo.GetByEmail(ctx, user.Email); err == nil {
+				return fmt.Errorf("用户邮箱已存在")
+			}
 		}
+
+		// 基于existingUser修改值
+		existingUser.Name = user.Name
+		existingUser.Number = user.Number
+		existingUser.Email = user.Email
+
+		// 处理密码（如果提供了新密码，需要加密）
+		if user.Password != "" {
+			existingUser.Password = hashPassword(user.Password, existingUser.PasswordSalt)
+		}
+
+		// 保存修改后的existingUser
+		return s.userRepo.Save(ctx, existingUser)
 	} else {
 		// 创建新用户
+
+		// 验证Number唯一性
+		if _, err := s.userRepo.GetByNumber(ctx, user.Number); err == nil {
+			return fmt.Errorf("用户账号已存在")
+		}
+
+		// 验证Email唯一性
+		if _, err := s.userRepo.GetByEmail(ctx, user.Email); err == nil {
+			return fmt.Errorf("用户邮箱已存在")
+		}
+
 		user.ID = uuid.New()
 		// 生成密码盐
 		if user.PasswordSalt == "" {
@@ -128,9 +158,9 @@ func (s *userService) SaveUser(ctx context.Context, user *models.SystemUser) err
 		if user.Password != "" {
 			user.Password = hashPassword(user.Password, user.PasswordSalt)
 		}
-	}
 
-	return s.userRepo.Save(ctx, user)
+		return s.userRepo.Save(ctx, user)
+	}
 }
 
 // GetAllUsers 获取所有用户
@@ -149,11 +179,23 @@ func (s *userService) GetUserByID(ctx context.Context, id uuid.UUID) (*models.Sy
 	return s.userRepo.GetByID(ctx, id)
 }
 
-// GetCurrentUser 根据Token获取当前登录用户
+// GetCurrentUser 获取当前登录用户
+// 获取当前登录用户信息
+// 参数：ctx - 上下文
+// 返回：当前登录用户对象
+func (s *userService) GetCurrentUser(ctx context.Context) (*models.SystemUser, error) {
+	user := ctx.Value(define.AppContextKeyCurrentUser)
+	if user != nil {
+		return user.(*models.SystemUser), nil
+	}
+	return nil, nil
+}
+
+// GetUserByToken 根据Token获取当前登录用户
 // 验证Token有效性并返回当前登录用户信息
 // 参数：ctx - 上下文，token - 用户Token
 // 返回：用户对象和错误信息
-func (s *userService) GetCurrentUser(ctx context.Context, token string) (*models.SystemUser, error) {
+func (s *userService) GetUserByToken(ctx context.Context, token string) (*models.SystemUser, error) {
 	// 根据Token获取会话
 	session, err := s.sessionRepo.GetByToken(ctx, token)
 	if err != nil {

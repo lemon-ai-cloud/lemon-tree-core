@@ -3,7 +3,8 @@
 package handler
 
 import (
-	"lemon-tree-core/internal/models"
+	"lemon-tree-core/internal/converter"
+	"lemon-tree-core/internal/dto"
 	"lemon-tree-core/internal/service"
 	"net/http"
 
@@ -48,8 +49,11 @@ func (h *ApplicationHandler) GetApplicationByID(c *gin.Context) {
 		return
 	}
 
-	// 返回应用信息
-	c.JSON(http.StatusOK, application)
+	// 转换为DTO返回
+	applicationDto := converter.ApplicationModelToApplicationDto(application)
+	c.JSON(http.StatusOK, gin.H{
+		"application": applicationDto,
+	})
 }
 
 // GetAllApplications 获取所有应用
@@ -63,51 +67,66 @@ func (h *ApplicationHandler) GetAllApplications(c *gin.Context) {
 		return
 	}
 
-	// 返回应用列表
-	c.JSON(http.StatusOK, applications)
+	// 转换为DTO列表返回
+	applicationDtos := converter.ApplicationModelListToApplicationDtoList(applications)
+	c.JSON(http.StatusOK, gin.H{
+		"applications": applicationDtos,
+	})
 }
 
 // SaveApplication 保存应用（upsert）
 // 处理 POST /api/v1/applications/save 请求
 // 如果应用存在则更新，不存在则创建
 func (h *ApplicationHandler) SaveApplication(c *gin.Context) {
-	// 绑定 JSON 请求体到 Application 结构体
-	var application models.Application
-	if err := c.ShouldBindJSON(&application); err != nil {
+	// 绑定 JSON 请求体到 ApplicationSaveDto 结构体
+	var applicationSaveDto dto.ApplicationSaveDto
+	if err := c.ShouldBindJSON(&applicationSaveDto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// 转换为模型
+	application := converter.ApplicationSaveDtoToApplicationModel(&applicationSaveDto)
+
 	// 调用业务逻辑层保存应用
-	if err := h.appService.SaveApplication(c.Request.Context(), &application); err != nil {
+	if err := h.appService.SaveApplication(c.Request.Context(), application); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 返回保存成功的响应
-	c.JSON(http.StatusOK, application)
+	// 转换为DTO返回
+	applicationDto := converter.ApplicationModelToApplicationDto(application)
+	c.JSON(http.StatusOK, gin.H{
+		"application": applicationDto,
+	})
 }
 
 // QueryApplications 动态查询应用
 // 处理 POST /api/v1/applications/query 请求
 // 根据查询条件动态查询应用
 func (h *ApplicationHandler) QueryApplications(c *gin.Context) {
-	// 绑定 JSON 请求体到 Application 结构体作为查询条件
-	var query models.Application
-	if err := c.ShouldBindJSON(&query); err != nil {
+	// 绑定 JSON 请求体到 ApplicationQueryDto 结构体作为查询条件
+	var queryDto dto.ApplicationQueryDto
+	if err := c.ShouldBindJSON(&queryDto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// 转换为模型
+	query := converter.ApplicationQueryDtoToApplicationModel(&queryDto)
+
 	// 调用业务逻辑层查询应用
-	applications, err := h.appService.QueryApplications(c.Request.Context(), &query)
+	applications, err := h.appService.QueryApplications(c.Request.Context(), query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 返回查询结果
-	c.JSON(http.StatusOK, applications)
+	// 转换为DTO列表返回
+	applicationDtos := converter.ApplicationModelListToApplicationDtoList(applications)
+	c.JSON(http.StatusOK, gin.H{
+		"applications": applicationDtos,
+	})
 }
 
 // DeleteApplication 删除应用

@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/repository"
 
@@ -58,8 +59,25 @@ func (s *applicationService) GetAllApplications(ctx context.Context) ([]*models.
 // 参数：ctx - 上下文，application - 要保存的应用对象
 // 返回：错误信息
 func (s *applicationService) SaveApplication(ctx context.Context, application *models.Application) error {
-	// 这里可以添加业务规则验证逻辑
-	return s.appRepo.Save(ctx, application)
+	// 检查应用是否已存在
+	if application.ID != uuid.Nil {
+		// 更新现有应用
+		existingApplication, err := s.appRepo.GetByID(ctx, application.ID)
+		if err != nil {
+			return fmt.Errorf("应用不存在: %w", err)
+		}
+
+		// 基于existingApplication修改值
+		existingApplication.Name = application.Name
+		existingApplication.Description = application.Description
+
+		// 保存修改后的existingApplication
+		return s.appRepo.Save(ctx, existingApplication)
+	} else {
+		// 创建新应用
+		application.ID = uuid.New()
+		return s.appRepo.Save(ctx, application)
+	}
 }
 
 // DeleteApplication 删除应用

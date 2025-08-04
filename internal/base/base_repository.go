@@ -69,22 +69,22 @@ func (r *baseRepository[T]) DeleteByID(ctx context.Context, id uuid.UUID) error 
 }
 
 // ListAll 获取所有实体
-// 从数据库中获取所有实体的信息列表
+// 从数据库中获取所有实体的信息列表（排除已删除的）
 // 参数：ctx - 上下文
 // 返回：实体列表和错误信息
 func (r *baseRepository[T]) ListAll(ctx context.Context) ([]*T, error) {
 	var entities []*T
-	err := r.db.WithContext(ctx).Find(&entities).Error
+	err := r.db.WithContext(ctx).Where("deleted_at IS NULL").Find(&entities).Error
 	return entities, err
 }
 
 // GetByID 根据ID获取实体
-// 根据 UUID 查找并返回指定的实体信息
+// 根据 UUID 查找并返回指定的实体信息（排除已删除的）
 // 参数：ctx - 上下文，id - 实体的 UUID
 // 返回：实体对象和错误信息
 func (r *baseRepository[T]) GetByID(ctx context.Context, id uuid.UUID) (*T, error) {
 	var entity T
-	err := r.db.WithContext(ctx).First(&entity, "id = ?", id).Error
+	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&entity).Error
 	if err != nil {
 		return nil, err
 	}
@@ -93,14 +93,14 @@ func (r *baseRepository[T]) GetByID(ctx context.Context, id uuid.UUID) (*T, erro
 
 // Query 动态查询实体
 // 根据传入的查询对象进行动态查询
-// 只查询非零值的字段
+// 只查询非零值的字段，排除已删除的
 // 参数：ctx - 上下文，query - 查询条件对象
 // 返回：匹配的实体列表和错误信息
 func (r *baseRepository[T]) Query(ctx context.Context, query *T) ([]*T, error) {
 	var entities []*T
 
 	// 构建查询条件
-	db := r.db.WithContext(ctx)
+	db := r.db.WithContext(ctx).Where("deleted_at IS NULL")
 
 	// 使用反射获取查询对象的非零值字段
 	queryMap := r.buildQueryMap(query)
