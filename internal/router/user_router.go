@@ -50,6 +50,11 @@ func SetupUserRoutes(api *gin.RouterGroup, userHandler *handler.UserHandler, use
 			// POST /api/v1/users/logout
 			// 用户登出，删除会话记录
 			authenticated.POST("/logout", userHandler.Logout)
+
+			// 删除用户
+			// DELETE /api/v1/users/:id
+			// 删除指定用户及其所有会话记录
+			authenticated.DELETE("/:id", userHandler.DeleteUser)
 		}
 	}
 }

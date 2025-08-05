@@ -19,6 +19,7 @@ type SystemUserSessionRepository interface {
 	GetByToken(ctx context.Context, token string) (*models.SystemUserSession, error)        // 根据Token获取会话
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*models.SystemUserSession, error) // 根据用户ID获取会话列表
 	DeleteExpiredSessions(ctx context.Context) error                                        // 删除过期会话
+	DeleteByUserID(ctx context.Context, userID uuid.UUID) error                             // 根据用户ID删除所有会话
 }
 
 // systemUserSessionRepository SystemUserSession 数据访问层实现
@@ -68,4 +69,12 @@ func (r *systemUserSessionRepository) GetByUserID(ctx context.Context, userID uu
 // 返回：错误信息
 func (r *systemUserSessionRepository) DeleteExpiredSessions(ctx context.Context) error {
 	return r.db.WithContext(ctx).Where("login_expired_at < NOW()").Delete(&models.SystemUserSession{}).Error
+}
+
+// DeleteByUserID 根据用户ID删除所有会话
+// 删除指定用户的所有会话记录
+// 参数：ctx - 上下文，userID - 用户ID
+// 返回：错误信息
+func (r *systemUserSessionRepository) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&models.SystemUserSession{}).Error
 }

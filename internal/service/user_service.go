@@ -21,6 +21,7 @@ import (
 type UserService interface {
 	Login(ctx context.Context, number, password string) (*models.SystemUser, string, error) // 用户登录
 	SaveUser(ctx context.Context, user *models.SystemUser) error                            // 保存用户（创建或更新）
+	DeleteUser(ctx context.Context, id uuid.UUID) error                                     // 删除用户
 	GetAllUsers(ctx context.Context) ([]*models.SystemUser, error)                          // 获取所有用户
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.SystemUser, error)              // 根据ID获取用户详情
 	GetUserByToken(ctx context.Context, token string) (*models.SystemUser, error)           // 根据Token获取当前登录用户
@@ -231,4 +232,54 @@ func (s *userService) Logout(ctx context.Context, token string) error {
 
 	// 删除会话
 	return s.sessionRepo.DeleteByID(ctx, session.ID)
+}
+
+// DeleteUser 删除用户
+// 删除指定用户及其所有会话记录
+// 参数：ctx - 上下文，id - 要删除的用户ID
+// 返回：错误信息
+func (s *userService) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	// 1. 检查用户是否存在
+	_, err := s.userRepo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("用户不存在: %w", err)
+	}
+
+	// 2. 检查是否为当前登录用户（不能删除自己）
+	currentUser, err := s.GetCurrentUser(ctx)
+	if err == nil && currentUser != nil && currentUser.ID == id {
+		return fmt.Errorf("不能删除当前登录的用户")
+	}
+
+	// 3. 检查是否为系统最后一个用户
+	allUsers, err := s.userRepo.ListAll(ctx)
+	if err != nil {
+		return fmt.Errorf("获取用户列表失败: %w", err)
+	}
+
+	// 过滤掉已删除的用户
+	var activeUsers []*models.SystemUser
+	for _, u := range allUsers {
+		if u.DeletedAt.Time.IsZero() {
+			activeUsers = append(activeUsers, u)
+		}
+	}
+
+	if len(activeUsers) <= 1 {
+		return fmt.Errorf("系统至少需要保留一个用户")
+	}
+
+	// 4. 删除用户的所有会话记录
+	err = s.sessionRepo.DeleteByUserID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("删除用户会话失败: %w", err)
+	}
+
+	// 5. 删除用户
+	err = s.userRepo.DeleteByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("删除用户失败: %w", err)
+	}
+
+	return nil
 }

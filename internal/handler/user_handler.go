@@ -170,3 +170,29 @@ func (h *UserHandler) Logout(c *gin.Context) {
 		"message": "success",
 	})
 }
+
+// DeleteUser 删除用户
+// 处理 DELETE /api/v1/users/:id 请求
+// 删除指定用户及其所有会话记录
+func (h *UserHandler) DeleteUser(c *gin.Context) {
+	// 从 URL 参数中获取 ID
+	idStr := c.Param("id")
+
+	// 解析 UUID 格式的 ID
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID格式"})
+		return
+	}
+
+	// 调用业务逻辑层删除用户
+	if err := h.userService.DeleteUser(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 返回删除成功的响应
+	c.JSON(http.StatusOK, gin.H{
+		"message": "用户删除成功",
+	})
+}
