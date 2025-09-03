@@ -15,25 +15,25 @@ import (
 // 负责管理所有路由的配置和中间件
 // 提供统一的路由设置接口
 type RouterManager struct {
-	appHandler               *handler.ApplicationHandler       // Application 处理器
-	userHandler              *handler.UserHandler              // User 处理器
-	llmProviderDefineHandler *handler.LlmProviderDefineHandler // LlmProviderDefine 处理器
-	resourceHandler          *handler.ResourceHandler          // Resource 处理器
-	userService              service.UserService               // User 服务
-	logger                   *zap.Logger                       // 日志记录器
+	appHandler         *handler.ApplicationHandler // Application 处理器
+	userHandler        *handler.UserHandler        // User 处理器
+	llmProviderHandler *handler.LlmProviderHandler // LlmProvider 处理器
+	resourceHandler    *handler.ResourceHandler    // Resource 处理器
+	userService        service.UserService         // User 服务
+	logger             *zap.Logger                 // 日志记录器
 }
 
 // NewRouterManager 创建路由管理器实例
 // 返回 RouterManager 的实例
-// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderDefineHandler - LlmProviderDefine 处理器，userService - User 服务，logger - 日志记录器
-func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderDefineHandler *handler.LlmProviderDefineHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
+// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，userService - User 服务，logger - 日志记录器
+func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
 	return &RouterManager{
-		appHandler:               appHandler,
-		userHandler:              userHandler,
-		llmProviderDefineHandler: llmProviderDefineHandler,
-		resourceHandler:          resourceHandler,
-		userService:              userService,
-		logger:                   logger,
+		appHandler:         appHandler,
+		userHandler:        userHandler,
+		llmProviderHandler: llmProviderHandler,
+		resourceHandler:    resourceHandler,
+		userService:        userService,
+		logger:             logger,
 	}
 }
 
@@ -81,8 +81,8 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 		// 设置 User 模块的路由
 		SetupUserRoutes(api, rm.userHandler, rm.userService)
 
-		// 设置 LlmProviderDefine 模块的路由
-		SetupLlmProviderDefineRoutes(api, rm.llmProviderDefineHandler)
+		// 设置 LlmProvider 模块的路由
+		SetupLlmProviderRoutes(api, rm.llmProviderHandler)
 
 		// 设置 Resource 模块的路由
 		SetupResourceRoutes(api, rm.resourceHandler)
@@ -94,29 +94,32 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 	return r
 }
 
-// SetupLlmProviderDefineRoutes 设置大语言模型提供商定义模块的路由
-// 配置 LlmProviderDefine 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - LlmProviderDefine 处理器
-func SetupLlmProviderDefineRoutes(api *gin.RouterGroup, handler *handler.LlmProviderDefineHandler) {
-	// 大语言模型提供商定义路由组
-	llmProviderDefines := api.Group("/llm-provider-defines")
+// SetupLlmProviderRoutes 设置大语言模型提供商模块的路由
+// 配置 LlmProvider 相关的所有 HTTP 路由
+// 参数：api - API 路由组，handler - LlmProvider 处理器
+func SetupLlmProviderRoutes(api *gin.RouterGroup, handler *handler.LlmProviderHandler) {
+	// 大语言模型提供商路由组
+	llmProviders := api.Group("/llm-providers")
 	{
-		// 获取所有提供商定义
-		llmProviderDefines.GET("", handler.GetAllLlmProviderDefines)
+		// 获取所有提供商
+		llmProviders.GET("", handler.GetAllLlmProviders)
 
-		// 根据ID获取提供商定义
-		llmProviderDefines.GET("/:id", handler.GetLlmProviderDefineByID)
+		// 根据ID获取提供商
+		llmProviders.GET("/:id", handler.GetLlmProviderByID)
 
-		// 保存提供商定义（创建或更新）
-		llmProviderDefines.POST("/save", handler.SaveLlmProviderDefine)
+		// 保存提供商（创建或更新）
+		llmProviders.POST("/save", handler.SaveLlmProvider)
 
-		// 上传提供商定义图标
-		llmProviderDefines.POST("/upload-icon", handler.UploadLlmProviderDefineIcon)
+		// 上传提供商图标
+		llmProviders.POST("/upload-icon", handler.UploadLlmProviderIcon)
 
-		// 动态查询提供商定义
-		llmProviderDefines.POST("/query", handler.QueryLlmProviderDefines)
+		// 动态查询提供商
+		llmProviders.POST("/query", handler.QueryLlmProviders)
 
-		// 删除提供商定义
-		llmProviderDefines.DELETE("/:id", handler.DeleteLlmProviderDefine)
+		// 删除提供商
+		llmProviders.DELETE("/:id", handler.DeleteLlmProvider)
+
+		// 根据应用ID获取提供商列表
+		llmProviders.GET("/application/:applicationId", handler.GetLlmProvidersByApplicationID)
 	}
 }

@@ -35,18 +35,18 @@ func NewContainer() *fx.App {
 		// Repository 层提供者（Repository Providers）
 		// 包含所有数据访问层的组件
 		fx.Provide(
-			repository.NewApplicationRepository,                            // 创建 Application Repository
-			repository.NewSystemUserRepository,                             // 创建 SystemUser Repository
-			repository.NewSystemUserSessionRepository,                      // 创建 SystemUserSession Repository
-			repository.NewApplicationLlmRepository,                         // 创建 ApplicationLlm Repository
-			repository.NewChatAgentRepository,                              // 创建 ChatAgent Repository
-			repository.NewChatAgentConversationRepository,                  // 创建 ChatAgentConversation Repository
-			repository.NewChatAgentMessageRepository,                       // 创建 ChatAgentMessage Repository
-			repository.NewChatAgentAttachmentRepository,                    // 创建 ChatAgentAttachment Repository
-			repository.NewChatAgentApiKeyRepository,                        // 创建 ChatAgentApiKey Repository
-			repository.NewChatConversationRepository,                       // 创建 ChatConversation Repository
-			repository.NewLlmProviderRepository,                            // 创建 LlmProvider Repository
-			repository.NewLlmProviderDefineRepository,                      // 创建 LlmProviderDefine Repository
+			repository.NewApplicationRepository,           // 创建 Application Repository
+			repository.NewSystemUserRepository,            // 创建 SystemUser Repository
+			repository.NewSystemUserSessionRepository,     // 创建 SystemUserSession Repository
+			repository.NewApplicationLlmRepository,        // 创建 ApplicationLlm Repository
+			repository.NewChatAgentRepository,             // 创建 ChatAgent Repository
+			repository.NewChatAgentConversationRepository, // 创建 ChatAgentConversation Repository
+			repository.NewChatAgentMessageRepository,      // 创建 ChatAgentMessage Repository
+			repository.NewChatAgentAttachmentRepository,   // 创建 ChatAgentAttachment Repository
+			repository.NewChatAgentApiKeyRepository,       // 创建 ChatAgentApiKey Repository
+			repository.NewChatConversationRepository,      // 创建 ChatConversation Repository
+			repository.NewLlmProviderRepository,           // 创建 LlmProvider Repository
+			// repository.NewLlmProviderDefineRepository,                      // 创建 LlmProviderDefine Repository (已删除)
 			repository.NewApplicationStorageConfigRepository,               // 创建 ApplicationStorageConfig Repository
 			repository.NewApplicationInternalToolNetSearchConfigRepository, // 创建 ApplicationInternalToolNetSearchConfig Repository
 			repository.NewApplicationMcpConfigConfigRepository,             // 创建 ApplicationMcpConfigConfig Repository
@@ -58,9 +58,9 @@ func NewContainer() *fx.App {
 		// Service 层提供者（Service Providers）
 		// 包含所有业务逻辑层的组件
 		fx.Provide(
-			service.NewApplicationService,       // 创建 Application Service
-			service.NewUserService,              // 创建 User Service
-			service.NewLlmProviderDefineService, // 创建 LlmProviderDefine Service
+			service.NewApplicationService, // 创建 Application Service
+			service.NewUserService,        // 创建 User Service
+			service.NewLlmProviderService, // 创建 LlmProvider Service
 			// 未来可以在这里添加更多 Service
 			// service.NewOrderService,
 		),
@@ -68,10 +68,10 @@ func NewContainer() *fx.App {
 		// Handler 层提供者（Handler Providers）
 		// 包含所有 HTTP 请求处理层的组件
 		fx.Provide(
-			handler.NewApplicationHandler,       // 创建 Application Handler
-			handler.NewUserHandler,              // 创建 User Handler
-			handler.NewLlmProviderDefineHandler, // 创建 LlmProviderDefine Handler
-			handler.NewResourceHandler,          // 创建 Resource Handler
+			handler.NewApplicationHandler, // 创建 Application Handler
+			handler.NewUserHandler,        // 创建 User Handler
+			handler.NewLlmProviderHandler, // 创建 LlmProvider Handler
+			handler.NewResourceHandler,    // 创建 Resource Handler
 			// 未来可以在这里添加更多 Handler
 			// handler.NewOrderHandler,
 		),

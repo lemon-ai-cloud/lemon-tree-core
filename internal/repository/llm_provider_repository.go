@@ -3,9 +3,11 @@
 package repository
 
 import (
+	"context"
 	"lemon-tree-core/internal/base"
 	"lemon-tree-core/internal/models"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -14,13 +16,18 @@ import (
 // 继承自 BaseRepository，包含基本的增删改查功能
 type LlmProviderRepository interface {
 	base.BaseRepository[models.LlmProvider] // 继承基础仓库接口
+
+	// GetByApplicationID 根据应用ID获取大语言模型提供商列表
+	// 返回指定应用下的所有提供商
+	GetByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.LlmProvider, error)
 }
 
 // llmProviderRepository LlmProvider 数据访问层实现
 // 实现了 LlmProviderRepository 接口的所有方法
 // 通过组合 baseRepository 来复用基础功能
 type llmProviderRepository struct {
-	base.BaseRepository[models.LlmProvider] // 组合基础仓库实现
+	base.BaseRepository[models.LlmProvider]          // 组合基础仓库实现
+	db                                      *gorm.DB // 直接保存数据库连接引用
 }
 
 // NewLlmProviderRepository 创建 LlmProvider Repository 实例
@@ -29,5 +36,14 @@ type llmProviderRepository struct {
 func NewLlmProviderRepository(db *gorm.DB) LlmProviderRepository {
 	return &llmProviderRepository{
 		BaseRepository: base.NewBaseRepository[models.LlmProvider](db),
+		db:             db,
 	}
+}
+
+// GetByApplicationID 根据应用ID获取大语言模型提供商列表
+// 返回指定应用下的所有提供商
+func (r *llmProviderRepository) GetByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.LlmProvider, error) {
+	var llmProviders []*models.LlmProvider
+	err := r.db.WithContext(ctx).Where("application_id = ?", applicationID).Find(&llmProviders).Error
+	return llmProviders, err
 }

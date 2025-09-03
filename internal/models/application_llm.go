@@ -2,8 +2,9 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"lemon-tree-core/internal/base"
+
+	"github.com/google/uuid"
 )
 
 // ApplicationLlm 应用模型
@@ -14,6 +15,7 @@ type ApplicationLlm struct {
 	Alias          string    `json:"alias" gorm:"type:varchar(64);not null;comment:模型别名"`
 	ApplicationID  uuid.UUID `json:"application_id" gorm:"type:char(36);not null;comment:所属应用ID"`
 	LlmProviderID  uuid.UUID `json:"llm_provider_id" gorm:"type:char(36);not null;comment:所属模型供应商ID"`
+	Enabled        bool      `json:"enabled" gorm:"type:tinyint(1);not null;comment:是否启用"`
 	// 大模型能力相关
 	AbilityVision         bool `json:"ability_vision" gorm:"type:tinyint(1);not null;comment:是否为视觉能力"`
 	AbilityNetwork        bool `json:"ability_network" gorm:"type:tinyint(1);not null;comment:是否有联网能力能力"`

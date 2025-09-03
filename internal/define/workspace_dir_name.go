@@ -1,5 +1,5 @@
 package define
 
 const (
-	WorkspaceDirNameLlmProviderDefineIcon = "/llm_provider_define_icon/"
+	WorkspaceDirNameLlmProviderIcon = "/llm_provider_icon/"
 )

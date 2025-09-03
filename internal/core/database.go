@@ -67,7 +67,6 @@ func NewDatabase(config *config.Config) (*gorm.DB, error) {
 		&models.ChatAgentApiKey{},                        // 聊天智能体API Key表
 		&models.ChatConversation{},                       // 聊天会话表
 		&models.LlmProvider{},                            // 大语言模型供应商表
-		&models.LlmProviderDefine{},                      // 大语言模型供应商预定义表
 		&models.ApplicationStorageConfig{},               // 应用存储配置表
 		&models.ApplicationInternalToolNetSearchConfig{}, // 应用内部工具网络搜索配置表
 		&models.ApplicationMcpConfigConfig{},             // 应用MCP服务器配置表
