@@ -47,15 +47,18 @@ type LlmProviderService interface {
 // llmProviderService 大语言模型提供商业务逻辑层实现
 // 实现 LlmProviderService 接口
 type llmProviderService struct {
-	llmProviderRepo repository.LlmProviderRepository // 数据访问层接口
+	llmProviderRepo       repository.LlmProviderRepository // 数据访问层接口
+	applicationLlmService ApplicationLlmService            // 应用模型服务接口
 }
 
 // NewLlmProviderService 创建大语言模型提供商服务实例
 // 返回 LlmProviderService 接口的实现
 // 参数：llmProviderRepo - 大语言模型提供商数据访问层接口
-func NewLlmProviderService(llmProviderRepo repository.LlmProviderRepository) LlmProviderService {
+// 参数：applicationLlmService - 应用模型服务接口
+func NewLlmProviderService(llmProviderRepo repository.LlmProviderRepository, applicationLlmService ApplicationLlmService) LlmProviderService {
 	return &llmProviderService{
-		llmProviderRepo: llmProviderRepo,
+		llmProviderRepo:       llmProviderRepo,
+		applicationLlmService: applicationLlmService,
 	}
 }
 
@@ -85,10 +88,11 @@ func (s *llmProviderService) SaveLlmProvider(ctx context.Context, llmProvider *m
 	}
 
 	// 根据ID判断是新增还是更新
+	var err error
 	if llmProvider.ID == uuid.Nil {
 		// 新增：生成新的UUID
 		llmProvider.ID = uuid.New()
-		return s.llmProviderRepo.Create(ctx, llmProvider)
+		err = s.llmProviderRepo.Create(ctx, llmProvider)
 	} else {
 		// 更新：检查记录是否存在
 		existing, err := s.llmProviderRepo.GetByID(ctx, llmProvider.ID)
@@ -98,8 +102,21 @@ func (s *llmProviderService) SaveLlmProvider(ctx context.Context, llmProvider *m
 		if existing == nil {
 			return fmt.Errorf("提供商不存在")
 		}
-		return s.llmProviderRepo.Update(ctx, llmProvider)
+		err = s.llmProviderRepo.Update(ctx, llmProvider)
 	}
+
+	// 如果保存成功且有API配置，尝试获取并保存模型列表
+	if err == nil && llmProvider.ApiUrl != "" && llmProvider.ApiKey != "" {
+		// 异步获取模型列表，不阻塞主流程
+		go func() {
+			if fetchErr := s.applicationLlmService.FetchAndSaveModels(context.Background(), llmProvider); fetchErr != nil {
+				// 记录错误日志，但不影响主流程
+				fmt.Printf("自动获取模型列表失败: %v\n", fetchErr)
+			}
+		}()
+	}
+
+	return err
 }
 
 // DeleteLlmProvider 删除大语言模型提供商

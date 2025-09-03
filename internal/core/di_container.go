@@ -58,20 +58,29 @@ func NewContainer() *fx.App {
 		// Service 层提供者（Service Providers）
 		// 包含所有业务逻辑层的组件
 		fx.Provide(
-			service.NewApplicationService, // 创建 Application Service
-			service.NewUserService,        // 创建 User Service
-			service.NewLlmProviderService, // 创建 LlmProvider Service
+			service.NewApplicationService,    // 创建 Application Service
+			service.NewUserService,           // 创建 User Service
+			service.NewApplicationLlmService, // 创建 ApplicationLlm Service
 			// 未来可以在这里添加更多 Service
 			// service.NewOrderService,
+		),
+
+		// 特殊依赖关系的 Service 提供者
+		fx.Provide(
+			// LlmProviderService 需要 ApplicationLlmService，所以单独提供
+			func(applicationLlmService service.ApplicationLlmService, llmProviderRepo repository.LlmProviderRepository) service.LlmProviderService {
+				return service.NewLlmProviderService(llmProviderRepo, applicationLlmService)
+			},
 		),
 
 		// Handler 层提供者（Handler Providers）
 		// 包含所有 HTTP 请求处理层的组件
 		fx.Provide(
-			handler.NewApplicationHandler, // 创建 Application Handler
-			handler.NewUserHandler,        // 创建 User Handler
-			handler.NewLlmProviderHandler, // 创建 LlmProvider Handler
-			handler.NewResourceHandler,    // 创建 Resource Handler
+			handler.NewApplicationHandler,    // 创建 Application Handler
+			handler.NewUserHandler,           // 创建 User Handler
+			handler.NewLlmProviderHandler,    // 创建 LlmProvider Handler
+			handler.NewApplicationLlmHandler, // 创建 ApplicationLlm Handler
+			handler.NewResourceHandler,       // 创建 Resource Handler
 			// 未来可以在这里添加更多 Handler
 			// handler.NewOrderHandler,
 		),

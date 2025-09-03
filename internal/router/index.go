@@ -15,25 +15,27 @@ import (
 // 负责管理所有路由的配置和中间件
 // 提供统一的路由设置接口
 type RouterManager struct {
-	appHandler         *handler.ApplicationHandler // Application 处理器
-	userHandler        *handler.UserHandler        // User 处理器
-	llmProviderHandler *handler.LlmProviderHandler // LlmProvider 处理器
-	resourceHandler    *handler.ResourceHandler    // Resource 处理器
-	userService        service.UserService         // User 服务
-	logger             *zap.Logger                 // 日志记录器
+	appHandler            *handler.ApplicationHandler    // Application 处理器
+	userHandler           *handler.UserHandler           // User 处理器
+	llmProviderHandler    *handler.LlmProviderHandler    // LlmProvider 处理器
+	applicationLlmHandler *handler.ApplicationLlmHandler // ApplicationLLM 处理器
+	resourceHandler       *handler.ResourceHandler       // Resource 处理器
+	userService           service.UserService            // User 服务
+	logger                *zap.Logger                    // 日志记录器
 }
 
 // NewRouterManager 创建路由管理器实例
 // 返回 RouterManager 的实例
-// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，userService - User 服务，logger - 日志记录器
-func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
+// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，resourceHandler - Resource 处理器，userService - User 服务，logger - 日志记录器
+func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
 	return &RouterManager{
-		appHandler:         appHandler,
-		userHandler:        userHandler,
-		llmProviderHandler: llmProviderHandler,
-		resourceHandler:    resourceHandler,
-		userService:        userService,
-		logger:             logger,
+		appHandler:            appHandler,
+		userHandler:           userHandler,
+		llmProviderHandler:    llmProviderHandler,
+		applicationLlmHandler: applicationLlmHandler,
+		resourceHandler:       resourceHandler,
+		userService:           userService,
+		logger:                logger,
 	}
 }
 
@@ -84,6 +86,9 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 		// 设置 LlmProvider 模块的路由
 		SetupLlmProviderRoutes(api, rm.llmProviderHandler)
 
+		// 设置 ApplicationLLM 模块的路由
+		SetupApplicationLlmRoutes(api, rm.applicationLlmHandler)
+
 		// 设置 Resource 模块的路由
 		SetupResourceRoutes(api, rm.resourceHandler)
 
@@ -121,5 +126,26 @@ func SetupLlmProviderRoutes(api *gin.RouterGroup, handler *handler.LlmProviderHa
 
 		// 根据应用ID获取提供商列表
 		llmProviders.GET("/application/:applicationId", handler.GetLlmProvidersByApplicationID)
+	}
+}
+
+// SetupApplicationLlmRoutes 设置应用模型模块的路由
+// 配置 ApplicationLLM 相关的所有 HTTP 路由
+// 参数：api - API 路由组，handler - ApplicationLLM 处理器
+func SetupApplicationLlmRoutes(api *gin.RouterGroup, handler *handler.ApplicationLlmHandler) {
+	// 应用模型路由组
+	applicationLlms := api.Group("/application-llms")
+	{
+		// 保存应用模型信息（创建或更新）
+		applicationLlms.POST("/save", handler.SaveApplicationLlm)
+
+		// 更新模型启用状态
+		applicationLlms.PUT("/:id/enabled", handler.UpdateEnabledStatus)
+
+		// 根据提供商ID获取模型列表
+		applicationLlms.GET("/provider/:providerId", handler.GetModelsByProviderID)
+
+		// 根据应用ID获取模型列表
+		applicationLlms.GET("/application/:applicationId", handler.GetModelsByApplicationID)
 	}
 }
