@@ -69,7 +69,8 @@ func NewDatabase(config *config.Config) (*gorm.DB, error) {
 		&models.LlmProvider{},                            // 大语言模型供应商表
 		&models.ApplicationStorageConfig{},               // 应用存储配置表
 		&models.ApplicationInternalToolNetSearchConfig{}, // 应用内部工具网络搜索配置表
-		&models.ApplicationMcpConfigConfig{},             // 应用MCP服务器配置表
+		&models.ApplicationMcpServerConfig{},             // 应用MCP服务器配置表
+		&models.ApplicationMcpServerTool{},               // 应用MCP服务器工具表
 	); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate: %w", err)
 	}

@@ -2,12 +2,13 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"lemon-tree-core/internal/base"
+
+	"github.com/google/uuid"
 )
 
-// ApplicationMcpConfigConfig 应用mcp配置
-type ApplicationMcpConfigConfig struct {
+// ApplicationMcpServerConfig 应用mcp配置
+type ApplicationMcpServerConfig struct {
 	base.BaseModel           // 继承基础模型，包含 ID、时间戳等通用字段
 	ApplicationID  uuid.UUID `json:"application_id" gorm:"type:char(36);not null;comment:所属应用ID"`
 	Name           string    `json:"name" gorm:"type:varchar(64);not null;comment:名称"`
@@ -27,6 +28,6 @@ type ApplicationMcpConfigConfig struct {
 
 // TableName 指定数据库表名
 // 返回该模型对应的数据库表名
-func (ApplicationMcpConfigConfig) TableName() string {
+func (ApplicationMcpServerConfig) TableName() string {
 	return "ltc_application_mcp_server_config"
 }

@@ -49,7 +49,8 @@ func NewContainer() *fx.App {
 			// repository.NewLlmProviderDefineRepository,                      // 创建 LlmProviderDefine Repository (已删除)
 			repository.NewApplicationStorageConfigRepository,               // 创建 ApplicationStorageConfig Repository
 			repository.NewApplicationInternalToolNetSearchConfigRepository, // 创建 ApplicationInternalToolNetSearchConfig Repository
-			repository.NewApplicationMcpConfigConfigRepository,             // 创建 ApplicationMcpConfigConfig Repository
+			repository.NewApplicationMcpServerConfigRepository,             // 创建 ApplicationMcpServerConfig Repository
+			repository.NewApplicationMcpServerToolRepository,               // 创建 ApplicationMcpServerTool Repository
 			// 未来可以在这里添加更多 Repository
 			// repository.NewUserRepository,
 			// repository.NewOrderRepository,
@@ -61,6 +62,10 @@ func NewContainer() *fx.App {
 			service.NewApplicationService,    // 创建 Application Service
 			service.NewUserService,           // 创建 User Service
 			service.NewApplicationLlmService, // 创建 ApplicationLlm Service
+			// ApplicationMcpServerConfigService 需要两个 repository，所以单独提供
+			func(applicationMcpServerConfigRepo repository.ApplicationMcpServerConfigRepository, applicationMcpServerToolRepo repository.ApplicationMcpServerToolRepository) service.ApplicationMcpServerConfigService {
+				return service.NewApplicationMcpServerConfigService(applicationMcpServerConfigRepo, applicationMcpServerToolRepo)
+			},
 			// 未来可以在这里添加更多 Service
 			// service.NewOrderService,
 		),
@@ -83,7 +88,8 @@ func NewContainer() *fx.App {
 			func(applicationLlmService service.ApplicationLlmService, llmProviderService service.LlmProviderService) *handler.ApplicationLlmHandler {
 				return handler.NewApplicationLlmHandler(applicationLlmService, llmProviderService)
 			},
-			handler.NewResourceHandler, // 创建 Resource Handler
+			handler.NewApplicationMcpServerConfigHandler, // 创建 ApplicationMcpServerConfig Handler
+			handler.NewResourceHandler,                   // 创建 Resource Handler
 			// 未来可以在这里添加更多 Handler
 			// handler.NewOrderHandler,
 		),
