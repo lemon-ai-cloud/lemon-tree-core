@@ -17,14 +17,17 @@ import (
 // 相当于 Java Spring Boot 中的 Controller
 type ApplicationLlmHandler struct {
 	applicationLlmService service.ApplicationLlmService // ApplicationLLM 业务逻辑层接口
+	llmProviderService    service.LlmProviderService    // LLM 提供商业务逻辑层接口
 }
 
 // NewApplicationLlmHandler 创建 ApplicationLLM Handler 实例
 // 返回 ApplicationLlmHandler 的实例
 // 参数：applicationLlmService - ApplicationLLM 业务逻辑层接口
-func NewApplicationLlmHandler(applicationLlmService service.ApplicationLlmService) *ApplicationLlmHandler {
+// 参数：llmProviderService - LLM 提供商业务逻辑层接口
+func NewApplicationLlmHandler(applicationLlmService service.ApplicationLlmService, llmProviderService service.LlmProviderService) *ApplicationLlmHandler {
 	return &ApplicationLlmHandler{
 		applicationLlmService: applicationLlmService,
+		llmProviderService:    llmProviderService,
 	}
 }
 
@@ -118,6 +121,42 @@ func (h *ApplicationLlmHandler) GetModelsByProviderID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"application_llm": modelDtos,
 	})
+}
+
+// FetchAndSaveModels 获取并保存模型列表
+// 处理 POST /api/v1/application-llms/provider/:providerId/fetch 请求
+// 从指定的 LLM 提供商获取模型列表并保存到数据库
+func (h *ApplicationLlmHandler) FetchAndSaveModels(c *gin.Context) {
+	// 从 URL 参数中获取提供商 ID
+	providerIDStr := c.Param("providerId")
+
+	// 解析 UUID 格式的提供商 ID
+	providerID, err := uuid.Parse(providerIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider UUID format"})
+		return
+	}
+
+	// 获取提供商信息
+	provider, err := h.llmProviderService.GetLlmProviderByID(c.Request.Context(), providerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get provider: " + err.Error()})
+		return
+	}
+
+	if provider == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Provider not found"})
+		return
+	}
+
+	// 调用业务逻辑层获取并保存模型
+	if err := h.applicationLlmService.FetchAndSaveModels(c.Request.Context(), provider); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch and save models: " + err.Error()})
+		return
+	}
+
+	// 返回成功响应
+	c.JSON(http.StatusOK, gin.H{"message": "Models fetched and saved successfully"})
 }
 
 // GetModelsByApplicationID 根据应用ID获取模型列表

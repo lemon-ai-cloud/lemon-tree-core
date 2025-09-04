@@ -147,5 +147,8 @@ func SetupApplicationLlmRoutes(api *gin.RouterGroup, handler *handler.Applicatio
 
 		// 根据应用ID获取模型列表
 		applicationLlms.GET("/application/:applicationId", handler.GetModelsByApplicationID)
+
+		// 获取并保存模型列表
+		applicationLlms.POST("/provider/:providerId/fetch", handler.FetchAndSaveModels)
 	}
 }

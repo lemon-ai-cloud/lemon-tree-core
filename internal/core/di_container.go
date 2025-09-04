@@ -76,11 +76,14 @@ func NewContainer() *fx.App {
 		// Handler 层提供者（Handler Providers）
 		// 包含所有 HTTP 请求处理层的组件
 		fx.Provide(
-			handler.NewApplicationHandler,    // 创建 Application Handler
-			handler.NewUserHandler,           // 创建 User Handler
-			handler.NewLlmProviderHandler,    // 创建 LlmProvider Handler
-			handler.NewApplicationLlmHandler, // 创建 ApplicationLlm Handler
-			handler.NewResourceHandler,       // 创建 Resource Handler
+			handler.NewApplicationHandler, // 创建 Application Handler
+			handler.NewUserHandler,        // 创建 User Handler
+			handler.NewLlmProviderHandler, // 创建 LlmProvider Handler
+			// ApplicationLlmHandler 需要 LlmProviderService，所以单独提供
+			func(applicationLlmService service.ApplicationLlmService, llmProviderService service.LlmProviderService) *handler.ApplicationLlmHandler {
+				return handler.NewApplicationLlmHandler(applicationLlmService, llmProviderService)
+			},
+			handler.NewResourceHandler, // 创建 Resource Handler
 			// 未来可以在这里添加更多 Handler
 			// handler.NewOrderHandler,
 		),

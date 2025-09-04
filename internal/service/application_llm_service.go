@@ -88,13 +88,30 @@ func (s *applicationLlmService) FetchAndSaveModels(ctx context.Context, llmProvi
 		return fmt.Errorf("不支持的提供商类型: %s", llmProvider.Type)
 	}
 
-	// 删除该提供商下的现有模型记录
-	if err := s.applicationLlmRepo.DeleteByProviderID(ctx, llmProvider.ID); err != nil {
-		return fmt.Errorf("删除现有模型记录失败: %w", err)
+	// 获取该提供商下的现有模型记录
+	existingModels, err := s.applicationLlmRepo.GetByProviderID(ctx, llmProvider.ID)
+	if err != nil {
+		return fmt.Errorf("获取现有模型记录失败: %w", err)
 	}
+
+	// 创建现有模型名称的映射，用于快速查找
+	existingModelNames := make(map[string]bool)
+	for _, existingModel := range existingModels {
+		existingModelNames[existingModel.Name] = true
+	}
+
+	// 统计新增和跳过的模型数量
+	addedCount := 0
+	skippedCount := 0
 
 	// 保存新的模型记录
 	for _, model := range openaiModels {
+		// 检查模型是否已存在
+		if existingModelNames[model.ID] {
+			skippedCount++
+			continue // 跳过已存在的模型
+		}
+
 		applicationLlm := &models.ApplicationLlm{
 			Name:          model.ID,
 			Alias:         model.ID, // 默认使用模型ID作为别名
@@ -117,7 +134,11 @@ func (s *applicationLlmService) FetchAndSaveModels(ctx context.Context, llmProvi
 		if err := s.applicationLlmRepo.Create(ctx, applicationLlm); err != nil {
 			return fmt.Errorf("保存模型记录失败: %w", err)
 		}
+		addedCount++
 	}
+
+	// 记录操作结果
+	fmt.Printf("模型同步完成: 新增 %d 个模型, 跳过 %d 个已存在的模型\n", addedCount, skippedCount)
 
 	return nil
 }
