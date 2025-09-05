@@ -31,8 +31,12 @@ type ApplicationMcpServerConfigService interface {
 	GetMcpServerConfigsByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.ApplicationMcpServerConfig, error)
 
 	// GetMcpServerTools 获取MCP服务器的所有工具
-	// 根据MCP配置ID连接服务器并返回可用工具列表
+	// 根据MCP配置ID从数据库获取工具列表，如果为空则自动同步
 	GetMcpServerTools(ctx context.Context, configID uuid.UUID) ([]*models.ApplicationMcpServerTool, error)
+
+	// SyncMcpServerTools 同步MCP服务器的工具列表
+	// 从MCP服务器获取工具列表并同步到数据库
+	SyncMcpServerTools(ctx context.Context, configID uuid.UUID) ([]*models.ApplicationMcpServerTool, error)
 }
 
 // applicationMcpServerConfigService ApplicationMCP配置 业务逻辑层实现
@@ -144,8 +148,26 @@ func (s *applicationMcpServerConfigService) validateApplicationMcpServerConfig(c
 }
 
 // GetMcpServerTools 获取MCP服务器的所有工具
-// 根据MCP配置ID连接服务器并返回可用工具列表
+// 根据MCP配置ID从数据库获取工具列表，如果为空则自动同步
 func (s *applicationMcpServerConfigService) GetMcpServerTools(ctx context.Context, configID uuid.UUID) ([]*models.ApplicationMcpServerTool, error) {
+	// 从数据库获取工具列表
+	tools, err := s.applicationMcpServerToolRepo.GetByApplicationMcpServerConfigID(ctx, configID)
+	if err != nil {
+		return nil, fmt.Errorf("从数据库获取工具失败: %w", err)
+	}
+
+	// 如果工具列表为空，自动执行一次同步
+	if len(tools) == 0 {
+		log.Printf("工具列表为空，自动执行同步: configID=%s", configID)
+		return s.SyncMcpServerTools(ctx, configID)
+	}
+
+	return tools, nil
+}
+
+// SyncMcpServerTools 同步MCP服务器的工具列表
+// 从MCP服务器获取工具列表并同步到数据库
+func (s *applicationMcpServerConfigService) SyncMcpServerTools(ctx context.Context, configID uuid.UUID) ([]*models.ApplicationMcpServerTool, error) {
 	// 获取MCP配置信息
 	config, err := s.applicationMcpServerConfigRepo.GetByID(ctx, configID)
 	if err != nil {
@@ -158,47 +180,54 @@ func (s *applicationMcpServerConfigService) GetMcpServerTools(ctx context.Contex
 	// 根据连接方式创建MCP客户端并获取工具
 	var tools []mcp.Tool
 	switch config.McpServerConnectType {
-	case "sse", "streamable-http":
-		tools, err = s.getToolsFromHTTPClient(ctx, config)
+	case "sse", "streamable-http", "stdio":
+		tools, err = s.getToolsFromMcpClient(ctx, config)
 		if err != nil {
 			return nil, fmt.Errorf("从HTTP客户端获取工具失败: %w", err)
-		}
-
-	case "stdio":
-		tools, err = s.getToolsFromStdioClient(ctx, config)
-		if err != nil {
-			return nil, fmt.Errorf("从STDIO客户端获取工具失败: %w", err)
 		}
 
 	default:
 		return nil, fmt.Errorf("不支持的连接方式: %s", config.McpServerConnectType)
 	}
 
-	// 保存工具到数据库
-	if err := s.saveMcpToolsToDatabase(ctx, config, tools); err != nil {
-		log.Printf("保存工具到数据库失败: %v", err)
+	// 同步工具到数据库
+	if err := s.syncMcpToolsToDatabase(ctx, config, tools); err != nil {
+		log.Printf("同步工具到数据库失败: %v", err)
 		// 不返回错误，继续执行
 	}
 
-	// 从数据库获取保存的工具列表
-	savedTools, err := s.applicationMcpServerToolRepo.GetByApplicationMcpServerConfigID(ctx, configID)
+	// 从数据库获取同步后的工具列表
+	syncedTools, err := s.applicationMcpServerToolRepo.GetByApplicationMcpServerConfigID(ctx, configID)
 	if err != nil {
 		return nil, fmt.Errorf("从数据库获取工具失败: %w", err)
 	}
 
-	return savedTools, nil
+	return syncedTools, nil
 }
 
-// getToolsFromHTTPClient 从HTTP/SSE客户端获取工具
-func (s *applicationMcpServerConfigService) getToolsFromHTTPClient(ctx context.Context, config *models.ApplicationMcpServerConfig) ([]mcp.Tool, error) {
-	// 创建HTTP传输
-	httpTransport, err := transport.NewStreamableHTTP(config.McpServerUrl)
-	if err != nil {
-		return nil, fmt.Errorf("创建HTTP传输失败: %w", err)
+// getToolsFromMcpClient 从HTTP/SSE客户端获取工具
+func (s *applicationMcpServerConfigService) getToolsFromMcpClient(ctx context.Context, config *models.ApplicationMcpServerConfig) ([]mcp.Tool, error) {
+	var c *client.Client
+	switch config.McpServerConnectType {
+	case "streamable-http":
+		// 创建HTTP传输
+		httpTransport, err := transport.NewStreamableHTTP(config.McpServerUrl)
+		if err != nil {
+			return nil, fmt.Errorf("创建Streamable HTTP传输失败: %w", err)
+		}
+		// 创建客户端
+		c = client.NewClient(httpTransport)
+	case "sse":
+		// 创建HTTP传输
+		sse, err := transport.NewSSE(config.McpServerUrl)
+		if err != nil {
+			return nil, fmt.Errorf("创建SSE传输失败: %w", err)
+		}
+		c = client.NewClient(sse)
+	case "studio":
+		studio := transport.NewStdio(config.McpServerCommand, []string{config.McpServerEnv}, "")
+		c = client.NewClient(studio)
 	}
-
-	// 创建客户端
-	c := client.NewClient(httpTransport)
 
 	// 初始化客户端
 	initRequest := mcp.InitializeRequest{}
@@ -237,51 +266,77 @@ func (s *applicationMcpServerConfigService) getToolsFromHTTPClient(ctx context.C
 	return toolsResult.Tools, nil
 }
 
-// getToolsFromStdioClient 从STDIO客户端获取工具
-func (s *applicationMcpServerConfigService) getToolsFromStdioClient(ctx context.Context, config *models.ApplicationMcpServerConfig) ([]mcp.Tool, error) {
-	// TODO: 实现STDIO客户端连接
-	// 这里需要根据config.McpServerCommand, config.McpServerArgs, config.McpServerEnv来创建STDIO传输
-	// 暂时返回空列表，等STDIO传输实现后再完善
-	log.Println("STDIO客户端连接功能待实现")
-	return []mcp.Tool{}, nil
-}
-
-// saveMcpToolsToDatabase 保存MCP工具到数据库
-// 先删除该配置下的所有工具，然后重新插入新的工具列表
-func (s *applicationMcpServerConfigService) saveMcpToolsToDatabase(ctx context.Context, config *models.ApplicationMcpServerConfig, tools []mcp.Tool) error {
-	// 先删除该配置下的所有工具
-	if err := s.applicationMcpServerToolRepo.DeleteByApplicationMcpServerConfigID(ctx, config.ID); err != nil {
-		return fmt.Errorf("删除现有工具失败: %w", err)
+// syncMcpToolsToDatabase 同步MCP工具到数据库
+// 实现增量更新：保留现有记录的ID和创建时间，只更新变化的字段
+func (s *applicationMcpServerConfigService) syncMcpToolsToDatabase(ctx context.Context, config *models.ApplicationMcpServerConfig, tools []mcp.Tool) error {
+	// 获取现有的工具列表
+	existingTools, err := s.applicationMcpServerToolRepo.GetByApplicationMcpServerConfigID(ctx, config.ID)
+	if err != nil {
+		return fmt.Errorf("获取现有工具失败: %w", err)
 	}
 
-	// 准备批量插入的工具数据
-	var toolsToCreate []*models.ApplicationMcpServerTool
-	for _, tool := range tools {
-		title := ""
-		if tool.Annotations.Title != "" {
-			title = tool.Annotations.Title
-		}
+	// 创建现有工具的映射，以name为key
+	existingToolsMap := make(map[string]*models.ApplicationMcpServerTool)
+	for _, tool := range existingTools {
+		existingToolsMap[tool.Name] = tool
+	}
 
+	// 创建新工具列表的映射，以name为key
+	newToolsMap := make(map[string]mcp.Tool)
+	for _, tool := range tools {
+		newToolsMap[tool.Name] = tool
+	}
+
+	// 处理每个新工具
+	for _, newTool := range tools {
+		title := ""
+		if newTool.Annotations.Title != "" {
+			title = newTool.Annotations.Title
+		}
 		// 如果title为空，使用name作为title
 		if title == "" {
-			title = tool.Name
+			title = newTool.Name
 		}
 
-		toolModel := &models.ApplicationMcpServerTool{
-			ApplicationID:                config.ApplicationID,
-			ApplicationMcpServerConfigID: config.ID,
-			Name:                         tool.Name,
-			Title:                        title,
-			Description:                  tool.Description,
-		}
+		if existingTool, exists := existingToolsMap[newTool.Name]; exists {
+			// 工具已存在，检查是否需要更新
+			needsUpdate := false
+			if existingTool.Description != newTool.Description {
+				existingTool.Description = newTool.Description
+				needsUpdate = true
+			}
+			if existingTool.Title != title {
+				existingTool.Title = title
+				needsUpdate = true
+			}
 
-		toolsToCreate = append(toolsToCreate, toolModel)
+			if needsUpdate {
+				if err := s.applicationMcpServerToolRepo.Update(ctx, existingTool); err != nil {
+					log.Printf("更新工具失败: %s, error: %v", newTool.Name, err)
+				}
+			}
+		} else {
+			// 工具不存在，创建新记录
+			newToolModel := &models.ApplicationMcpServerTool{
+				ApplicationID:                config.ApplicationID,
+				ApplicationMcpServerConfigID: config.ID,
+				Name:                         newTool.Name,
+				Title:                        title,
+				Description:                  newTool.Description,
+			}
+
+			if err := s.applicationMcpServerToolRepo.Create(ctx, newToolModel); err != nil {
+				log.Printf("创建工具失败: %s, error: %v", newTool.Name, err)
+			}
+		}
 	}
 
-	// 批量创建工具记录
-	if len(toolsToCreate) > 0 {
-		if err := s.applicationMcpServerToolRepo.BatchCreate(ctx, toolsToCreate); err != nil {
-			return fmt.Errorf("批量创建工具失败: %w", err)
+	// 删除不再存在的工具
+	for toolName, existingTool := range existingToolsMap {
+		if _, exists := newToolsMap[toolName]; !exists {
+			if err := s.applicationMcpServerToolRepo.Delete(ctx, existingTool.ID); err != nil {
+				log.Printf("删除工具失败: %s, error: %v", toolName, err)
+			}
 		}
 	}
 

@@ -14,7 +14,7 @@ type ApplicationMcpServerTool struct {
 	ApplicationMcpServerConfigID uuid.UUID `json:"application_mcp_server_config_id" gorm:"type:char(36);not null;comment:所属mcp服务配置ID"`
 	Name                         string    `json:"name" gorm:"type:varchar(64);not null;comment:工具名称"`
 	Title                        string    `json:"title" gorm:"type:varchar(64);not null;comment:标题"`
-	Description                  string    `json:"description" gorm:"type:varchar(512);not null;comment:描述"`
+	Description                  string    `json:"description" gorm:"type:text;not null;comment:描述"`
 }
 
 // TableName 指定数据库表名

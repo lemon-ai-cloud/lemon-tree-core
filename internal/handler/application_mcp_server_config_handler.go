@@ -134,3 +134,32 @@ func (h *ApplicationMcpServerConfigHandler) GetMcpServerTools(c *gin.Context) {
 		"tools": toolDtos,
 	})
 }
+
+// SyncMcpServerTools 同步MCP服务器的工具列表
+// 处理 POST /api/v1/application-mcp-server-configs/:id/sync-tools 请求
+// 从MCP服务器获取工具列表并同步到数据库
+func (h *ApplicationMcpServerConfigHandler) SyncMcpServerTools(c *gin.Context) {
+	// 从 URL 参数中获取 ID
+	idStr := c.Param("id")
+
+	// 解析 UUID 格式的 ID
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid UUID format"})
+		return
+	}
+
+	// 调用业务逻辑层同步工具列表
+	tools, err := h.applicationMcpServerConfigService.SyncMcpServerTools(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 转换为DTO列表返回
+	toolDtos := converter.ApplicationMcpServerToolModelListToApplicationMcpServerToolDtoList(tools)
+	c.JSON(http.StatusOK, gin.H{
+		"tools":   toolDtos,
+		"message": "工具列表同步成功",
+	})
+}

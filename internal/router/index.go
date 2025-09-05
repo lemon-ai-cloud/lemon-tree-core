@@ -176,5 +176,8 @@ func SetupApplicationMcpServerConfigRoutes(api *gin.RouterGroup, handler *handle
 
 		// 获取MCP服务器的所有工具
 		applicationMcpServerConfigs.GET("/:id/tools", handler.GetMcpServerTools)
+
+		// 同步MCP服务器的工具列表
+		applicationMcpServerConfigs.POST("/:id/sync-tools", handler.SyncMcpServerTools)
 	}
 }
