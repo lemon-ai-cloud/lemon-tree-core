@@ -20,6 +20,7 @@ type RouterManager struct {
 	llmProviderHandler                *handler.LlmProviderHandler                // LlmProvider 处理器
 	applicationLlmHandler             *handler.ApplicationLlmHandler             // ApplicationLLM 处理器
 	applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler // ApplicationMCP配置 处理器
+	chatAgentHandler                  *handler.ChatAgentHandler                  // ChatAgent 处理器
 	resourceHandler                   *handler.ResourceHandler                   // Resource 处理器
 	userService                       service.UserService                        // User 服务
 	logger                            *zap.Logger                                // 日志记录器
@@ -27,14 +28,15 @@ type RouterManager struct {
 
 // NewRouterManager 创建路由管理器实例
 // 返回 RouterManager 的实例
-// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，applicationMcpServerConfigHandler - ApplicationMCP配置 处理器，resourceHandler - Resource 处理器，userService - User 服务，logger - 日志记录器
-func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
+// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，applicationMcpServerConfigHandler - ApplicationMCP配置 处理器，chatAgentHandler - ChatAgent 处理器，resourceHandler - Resource 处理器，userService - User 服务，logger - 日志记录器
+func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler, chatAgentHandler *handler.ChatAgentHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
 	return &RouterManager{
 		appHandler:                        appHandler,
 		userHandler:                       userHandler,
 		llmProviderHandler:                llmProviderHandler,
 		applicationLlmHandler:             applicationLlmHandler,
 		applicationMcpServerConfigHandler: applicationMcpServerConfigHandler,
+		chatAgentHandler:                  chatAgentHandler,
 		resourceHandler:                   resourceHandler,
 		userService:                       userService,
 		logger:                            logger,
@@ -93,6 +95,9 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 
 		// 设置 ApplicationMCP配置 模块的路由
 		SetupApplicationMcpServerConfigRoutes(api, rm.applicationMcpServerConfigHandler)
+
+		// 设置 ChatAgent 模块的路由
+		SetupChatAgentRoutes(api, rm.chatAgentHandler)
 
 		// 设置 Resource 模块的路由
 		SetupResourceRoutes(api, rm.resourceHandler)
@@ -179,5 +184,26 @@ func SetupApplicationMcpServerConfigRoutes(api *gin.RouterGroup, handler *handle
 
 		// 同步MCP服务器的工具列表
 		applicationMcpServerConfigs.POST("/:id/sync-tools", handler.SyncMcpServerTools)
+	}
+}
+
+// SetupChatAgentRoutes 设置智能体模块的路由
+// 配置 ChatAgent 相关的所有 HTTP 路由
+// 参数：api - API 路由组，handler - ChatAgent 处理器
+func SetupChatAgentRoutes(api *gin.RouterGroup, handler *handler.ChatAgentHandler) {
+	// 智能体路由组
+	chatAgents := api.Group("/chat-agents")
+	{
+		// 保存智能体信息（创建或更新）
+		chatAgents.POST("/save", handler.SaveChatAgent)
+
+		// 删除智能体
+		chatAgents.DELETE("/:id", handler.DeleteChatAgent)
+
+		// 根据应用ID获取智能体列表（分页）
+		chatAgents.GET("/application/:applicationId", handler.GetChatAgentsByApplicationID)
+
+		// 上传智能体头像
+		chatAgents.POST("/upload-avatar", handler.UploadChatAgentAvatar)
 	}
 }
