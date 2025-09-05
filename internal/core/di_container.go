@@ -55,10 +55,11 @@ func NewContainer() *fx.App {
 		// Service 层提供者（Service Providers）
 		// 包含所有业务逻辑层的组件
 		fx.Provide(
-			service.NewApplicationService,    // 创建 Application Service
-			service.NewUserService,           // 创建 User Service
-			service.NewApplicationLlmService, // 创建 ApplicationLlm Service
-			service.NewChatAgentService,      // 创建 ChatAgent Service
+			service.NewApplicationService,              // 创建 Application Service
+			service.NewUserService,                     // 创建 User Service
+			service.NewApplicationLlmService,           // 创建 ApplicationLlm Service
+			service.NewChatAgentService,                // 创建 ChatAgent Service
+			service.NewApplicationStorageConfigService, // 创建 ApplicationStorageConfig Service
 			// ApplicationMcpServerConfigService 需要两个 repository，所以单独提供
 			func(applicationMcpServerConfigRepo repository.ApplicationMcpServerConfigRepository, applicationMcpServerToolRepo repository.ApplicationMcpServerToolRepository) service.ApplicationMcpServerConfigService {
 				return service.NewApplicationMcpServerConfigService(applicationMcpServerConfigRepo, applicationMcpServerToolRepo)
@@ -87,6 +88,7 @@ func NewContainer() *fx.App {
 			},
 			handler.NewApplicationMcpServerConfigHandler, // 创建 ApplicationMcpServerConfig Handler
 			handler.NewChatAgentHandler,                  // 创建 ChatAgent Handler
+			handler.NewApplicationStorageConfigHandler,   // 创建 ApplicationStorageConfig Handler
 			handler.NewResourceHandler,                   // 创建 Resource Handler
 			// 未来可以在这里添加更多 Handler
 			// handler.NewOrderHandler,
