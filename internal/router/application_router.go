@@ -19,7 +19,7 @@ func SetupApplicationRoutes(api *gin.RouterGroup, appHandler *handler.Applicatio
 	{
 
 		authenticated := applications.Group("")
-		authenticated.Use(middleware.AuthMiddleware(userService))
+		authenticated.Use(middleware.UserAuthMiddleware(userService))
 		{
 			// 获取应用列表
 			// GET /api/v1/applications

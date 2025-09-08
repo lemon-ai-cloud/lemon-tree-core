@@ -21,16 +21,19 @@ type RouterManager struct {
 	applicationLlmHandler             *handler.ApplicationLlmHandler             // ApplicationLLM 处理器
 	applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler // ApplicationMCP配置 处理器
 	chatAgentHandler                  *handler.ChatAgentHandler                  // ChatAgent 处理器
+	chatAgentConversationHandler      *handler.ChatAgentConversationHandler      // ChatAgentConversation 处理器
 	applicationStorageConfigHandler   *handler.ApplicationStorageConfigHandler   // ApplicationStorageConfig 处理器
 	resourceHandler                   *handler.ResourceHandler                   // Resource 处理器
 	userService                       service.UserService                        // User 服务
+	chatAgentService                  service.ChatAgentService                   // ChatAgent 服务
+	applicationService                service.ApplicationService                 // Application 服务
 	logger                            *zap.Logger                                // 日志记录器
 }
 
 // NewRouterManager 创建路由管理器实例
 // 返回 RouterManager 的实例
-// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，applicationMcpServerConfigHandler - ApplicationMCP配置 处理器，chatAgentHandler - ChatAgent 处理器，applicationStorageConfigHandler - ApplicationStorageConfig 处理器，resourceHandler - Resource 处理器，userService - User 服务，logger - 日志记录器
-func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler, chatAgentHandler *handler.ChatAgentHandler, applicationStorageConfigHandler *handler.ApplicationStorageConfigHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, logger *zap.Logger) *RouterManager {
+// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，applicationMcpServerConfigHandler - ApplicationMCP配置 处理器，chatAgentHandler - ChatAgent 处理器，chatAgentConversationHandler - ChatAgentConversation 处理器，applicationStorageConfigHandler - ApplicationStorageConfig 处理器，resourceHandler - Resource 处理器，userService - User 服务，chatAgentService - ChatAgent 服务，applicationService - Application 服务，logger - 日志记录器
+func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler, chatAgentHandler *handler.ChatAgentHandler, chatAgentConversationHandler *handler.ChatAgentConversationHandler, applicationStorageConfigHandler *handler.ApplicationStorageConfigHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, chatAgentService service.ChatAgentService, applicationService service.ApplicationService, logger *zap.Logger) *RouterManager {
 	return &RouterManager{
 		appHandler:                        appHandler,
 		userHandler:                       userHandler,
@@ -38,28 +41,13 @@ func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handl
 		applicationLlmHandler:             applicationLlmHandler,
 		applicationMcpServerConfigHandler: applicationMcpServerConfigHandler,
 		chatAgentHandler:                  chatAgentHandler,
+		chatAgentConversationHandler:      chatAgentConversationHandler,
 		applicationStorageConfigHandler:   applicationStorageConfigHandler,
 		resourceHandler:                   resourceHandler,
 		userService:                       userService,
+		chatAgentService:                  chatAgentService,
+		applicationService:                applicationService,
 		logger:                            logger,
-	}
-}
-
-// SetupResourceRoutes 设置资源文件模块的路由
-// 配置 Resource 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - Resource 处理器
-func SetupResourceRoutes(api *gin.RouterGroup, handler *handler.ResourceHandler) {
-	// 资源文件路由组
-	resources := api.Group("/resources")
-	{
-		// 下载文件
-		resources.GET("/download", handler.DownloadFile)
-
-		// 列出目录文件
-		resources.GET("/list", handler.ListFiles)
-
-		// 获取文件信息
-		resources.GET("/info", handler.GetFileInfo)
 	}
 }
 
@@ -101,6 +89,9 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 		// 设置 ChatAgent 模块的路由
 		SetupChatAgentRoutes(api, rm.chatAgentHandler)
 
+		// 设置 ChatAgentConversation 模块的路由
+		SetupChatAgentConversationRoutes(api, rm.chatAgentConversationHandler, rm.chatAgentService, rm.applicationService)
+
 		// 设置 ApplicationStorageConfig 模块的路由
 		SetupApplicationStorageConfigRoutes(api, rm.applicationStorageConfigHandler)
 
@@ -112,118 +103,4 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 	}
 
 	return r
-}
-
-// SetupLlmProviderRoutes 设置大语言模型提供商模块的路由
-// 配置 LlmProvider 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - LlmProvider 处理器
-func SetupLlmProviderRoutes(api *gin.RouterGroup, handler *handler.LlmProviderHandler) {
-	// 大语言模型提供商路由组
-	llmProviders := api.Group("/llm-providers")
-	{
-		// 获取所有提供商
-		llmProviders.GET("", handler.GetAllLlmProviders)
-
-		// 根据ID获取提供商
-		llmProviders.GET("/:id", handler.GetLlmProviderByID)
-
-		// 保存提供商（创建或更新）
-		llmProviders.POST("/save", handler.SaveLlmProvider)
-
-		// 上传提供商图标
-		llmProviders.POST("/upload-icon", handler.UploadLlmProviderIcon)
-
-		// 动态查询提供商
-		llmProviders.POST("/query", handler.QueryLlmProviders)
-
-		// 删除提供商
-		llmProviders.DELETE("/:id", handler.DeleteLlmProvider)
-
-		// 根据应用ID获取提供商列表
-		llmProviders.GET("/application/:applicationId", handler.GetLlmProvidersByApplicationID)
-	}
-}
-
-// SetupApplicationLlmRoutes 设置应用模型模块的路由
-// 配置 ApplicationLLM 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - ApplicationLLM 处理器
-func SetupApplicationLlmRoutes(api *gin.RouterGroup, handler *handler.ApplicationLlmHandler) {
-	// 应用模型路由组
-	applicationLlms := api.Group("/application-llms")
-	{
-		// 保存应用模型信息（创建或更新）
-		applicationLlms.POST("/save", handler.SaveApplicationLlm)
-
-		// 更新模型启用状态
-		applicationLlms.PUT("/:id/enabled", handler.UpdateEnabledStatus)
-
-		// 根据提供商ID获取模型列表
-		applicationLlms.GET("/provider/:providerId", handler.GetModelsByProviderID)
-
-		// 根据应用ID获取模型列表
-		applicationLlms.GET("/application/:applicationId", handler.GetModelsByApplicationID)
-
-		// 获取并保存模型列表
-		applicationLlms.POST("/provider/:providerId/fetch", handler.FetchAndSaveModels)
-	}
-}
-
-// SetupApplicationMcpServerConfigRoutes 设置应用MCP配置模块的路由
-// 配置 ApplicationMCP配置 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - ApplicationMCP配置 处理器
-func SetupApplicationMcpServerConfigRoutes(api *gin.RouterGroup, handler *handler.ApplicationMcpServerConfigHandler) {
-	// 应用MCP配置路由组
-	applicationMcpServerConfigs := api.Group("/application-mcp-server-configs")
-	{
-		// 保存应用MCP配置信息（创建或更新）
-		applicationMcpServerConfigs.POST("/save", handler.SaveApplicationMcpServerConfig)
-
-		// 删除MCP配置
-		applicationMcpServerConfigs.DELETE("/:id", handler.DeleteApplicationMcpServerConfig)
-
-		// 根据应用ID获取MCP配置列表
-		applicationMcpServerConfigs.GET("/application/:applicationId", handler.GetMcpServerConfigsByApplicationID)
-
-		// 获取MCP服务器的所有工具
-		applicationMcpServerConfigs.GET("/:id/tools", handler.GetMcpServerTools)
-
-		// 同步MCP服务器的工具列表
-		applicationMcpServerConfigs.POST("/:id/sync-tools", handler.SyncMcpServerTools)
-	}
-}
-
-// SetupChatAgentRoutes 设置智能体模块的路由
-// 配置 ChatAgent 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - ChatAgent 处理器
-func SetupChatAgentRoutes(api *gin.RouterGroup, handler *handler.ChatAgentHandler) {
-	// 智能体路由组
-	chatAgents := api.Group("/chat-agents")
-	{
-		// 保存智能体信息（创建或更新）
-		chatAgents.POST("/save", handler.SaveChatAgent)
-
-		// 删除智能体
-		chatAgents.DELETE("/:id", handler.DeleteChatAgent)
-
-		// 根据应用ID获取智能体列表（分页）
-		chatAgents.GET("/application/:applicationId", handler.GetChatAgentsByApplicationID)
-
-		// 上传智能体头像
-		chatAgents.POST("/upload-avatar", handler.UploadChatAgentAvatar)
-	}
-}
-
-// SetupApplicationStorageConfigRoutes 设置应用存储配置模块的路由
-// 配置 ApplicationStorageConfig 相关的所有 HTTP 路由
-// 参数：api - API 路由组，handler - ApplicationStorageConfig 处理器
-func SetupApplicationStorageConfigRoutes(api *gin.RouterGroup, handler *handler.ApplicationStorageConfigHandler) {
-	// 应用存储配置路由组
-	applicationStorageConfigs := api.Group("/application-storage-configs")
-	{
-		// 保存应用存储配置
-		applicationStorageConfigs.POST("/save", handler.SaveApplicationStorageConfig)
-
-		// 根据应用ID获取存储配置
-		applicationStorageConfigs.GET("/application/:applicationId", handler.GetApplicationStorageConfigByApplicationID)
-	}
 }

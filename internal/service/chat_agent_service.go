@@ -25,12 +25,17 @@ type ChatAgentService interface {
 	// GetChatAgentsByApplicationID 根据应用ID获取智能体列表
 	// 返回指定应用下的所有智能体，支持分页
 	GetChatAgentsByApplicationID(ctx context.Context, applicationID uuid.UUID, page, pageSize int) ([]*models.ChatAgent, int64, error)
+
+	// GetChatAgentByApiKey 根据API Key获取聊天智能体
+	// 返回指定API Key的聊天智能体
+	GetChatAgentByApiKey(ctx context.Context, apiKey string) (*models.ChatAgent, error) // 根据API Key获取应用
 }
 
 // chatAgentService 智能体 业务逻辑层实现
 // 实现 ChatAgentService 接口
 type chatAgentService struct {
-	chatAgentRepo repository.ChatAgentRepository // 数据访问层接口
+	chatAgentRepo       repository.ChatAgentRepository // 数据访问层接口
+	chatAgentApiKeyRepo repository.ChatAgentApiKeyRepository
 }
 
 // NewChatAgentService 创建 智能体 服务实例
@@ -86,6 +91,17 @@ func (s *chatAgentService) DeleteChatAgent(ctx context.Context, id uuid.UUID) er
 // 返回指定应用下的所有智能体，支持分页
 func (s *chatAgentService) GetChatAgentsByApplicationID(ctx context.Context, applicationID uuid.UUID, page, pageSize int) ([]*models.ChatAgent, int64, error) {
 	return s.chatAgentRepo.GetByApplicationIDWithPagination(ctx, applicationID, page, pageSize)
+}
+
+// GetChatAgentByApiKey 根据API Key获取聊天智能体
+// 返回指定API Key的聊天智能体
+func (s *chatAgentService) GetChatAgentByApiKey(ctx context.Context, apiKey string) (*models.ChatAgent, error) {
+	apiKeyObj, getApiKeyErr := s.chatAgentApiKeyRepo.GetByApiKey(ctx, apiKey)
+	if getApiKeyErr != nil {
+		return nil, getApiKeyErr
+	} else {
+		return s.chatAgentRepo.GetByID(ctx, apiKeyObj.ChatAgentID)
+	}
 }
 
 // validateChatAgent 验证智能体数据

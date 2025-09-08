@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // NewContainer 创建依赖注入容器
@@ -64,6 +65,30 @@ func NewContainer() *fx.App {
 			func(applicationMcpServerConfigRepo repository.ApplicationMcpServerConfigRepository, applicationMcpServerToolRepo repository.ApplicationMcpServerToolRepository) service.ApplicationMcpServerConfigService {
 				return service.NewApplicationMcpServerConfigService(applicationMcpServerConfigRepo, applicationMcpServerToolRepo)
 			},
+			// ChatAgentConversationService 需要多个 repository，所以单独提供
+			func(
+				db *gorm.DB,
+				conversationRepo repository.ChatAgentConversationRepository,
+				messageRepo repository.ChatAgentMessageRepository,
+				attachmentRepo repository.ChatAgentAttachmentRepository,
+				chatAgentRepo repository.ChatAgentRepository,
+				applicationRepo repository.ApplicationRepository,
+				llmRepo repository.ApplicationLlmRepository,
+				mcpConfigRepo repository.ApplicationMcpServerConfigRepository,
+				mcpToolRepo repository.ApplicationMcpServerToolRepository,
+			) service.ChatAgentConversationService {
+				return service.NewChatAgentConversationService(
+					db,
+					conversationRepo,
+					messageRepo,
+					attachmentRepo,
+					chatAgentRepo,
+					applicationRepo,
+					llmRepo,
+					mcpConfigRepo,
+					mcpToolRepo,
+				)
+			},
 			// 未来可以在这里添加更多 Service
 			// service.NewOrderService,
 		),
@@ -88,6 +113,7 @@ func NewContainer() *fx.App {
 			},
 			handler.NewApplicationMcpServerConfigHandler, // 创建 ApplicationMcpServerConfig Handler
 			handler.NewChatAgentHandler,                  // 创建 ChatAgent Handler
+			handler.NewChatAgentConversationHandler,      // 创建 ChatAgentConversation Handler
 			handler.NewApplicationStorageConfigHandler,   // 创建 ApplicationStorageConfig Handler
 			handler.NewResourceHandler,                   // 创建 Resource Handler
 			// 未来可以在这里添加更多 Handler

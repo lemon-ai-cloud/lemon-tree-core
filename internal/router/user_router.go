@@ -24,7 +24,7 @@ func SetupUserRoutes(api *gin.RouterGroup, userHandler *handler.UserHandler, use
 
 		// 需要认证的路由组
 		authenticated := users.Group("")
-		authenticated.Use(middleware.AuthMiddleware(userService))
+		authenticated.Use(middleware.UserAuthMiddleware(userService))
 		{
 			// 保存用户（创建或更新）
 			// POST /api/v1/users/save
