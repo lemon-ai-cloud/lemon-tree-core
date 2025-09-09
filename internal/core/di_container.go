@@ -77,6 +77,7 @@ func NewContainer() *fx.App {
 				llmRepo repository.ApplicationLlmRepository,
 				mcpConfigRepo repository.ApplicationMcpServerConfigRepository,
 				mcpToolRepo repository.ApplicationMcpServerToolRepository,
+				chatAgentMcpServerToolRepo repository.ChatAgentMcpServerToolRepository,
 				llmProviderRepo repository.LlmProviderRepository,
 			) service.ChatAgentConversationService {
 				return service.NewChatAgentConversationService(
@@ -89,6 +90,7 @@ func NewContainer() *fx.App {
 					llmRepo,
 					mcpConfigRepo,
 					mcpToolRepo,
+					chatAgentMcpServerToolRepo,
 					llmProviderRepo,
 				)
 			},

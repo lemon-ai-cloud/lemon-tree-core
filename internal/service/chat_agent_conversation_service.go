@@ -17,6 +17,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sashabaranov/go-openai"
 	"gorm.io/gorm"
 )
@@ -47,21 +50,26 @@ type ChatAgentConversationService interface {
 
 	// RenameConversationTitle 重命名会话标题
 	RenameConversationTitle(ctx context.Context, chatAgentID, serviceUserID, conversationID, newTitle string) (*dto.RenameConversationResponse, error)
+
+	// GetChatAgentMcpServerTools 获取聊天智能体启用的MCP工具列表
+	// 根据chatAgentID查询启用的工具，并从MCP服务器获取最新的工具信息
+	GetChatAgentMcpServerTools(ctx context.Context, chatAgentID uuid.UUID) ([]openai.Tool, error)
 }
 
 // chatAgentConversationService 聊天会话 业务逻辑层实现
 // 实现 ChatAgentConversationService 接口
 type chatAgentConversationService struct {
-	db               *gorm.DB
-	conversationRepo repository.ChatAgentConversationRepository
-	messageRepo      repository.ChatAgentMessageRepository
-	attachmentRepo   repository.ChatAgentAttachmentRepository
-	chatAgentRepo    repository.ChatAgentRepository
-	applicationRepo  repository.ApplicationRepository
-	llmRepo          repository.ApplicationLlmRepository
-	mcpConfigRepo    repository.ApplicationMcpServerConfigRepository
-	mcpToolRepo      repository.ApplicationMcpServerToolRepository
-	llmProviderRepo  repository.LlmProviderRepository
+	db                         *gorm.DB
+	conversationRepo           repository.ChatAgentConversationRepository
+	messageRepo                repository.ChatAgentMessageRepository
+	attachmentRepo             repository.ChatAgentAttachmentRepository
+	chatAgentRepo              repository.ChatAgentRepository
+	applicationRepo            repository.ApplicationRepository
+	llmRepo                    repository.ApplicationLlmRepository
+	mcpConfigRepo              repository.ApplicationMcpServerConfigRepository
+	mcpToolRepo                repository.ApplicationMcpServerToolRepository
+	chatAgentMcpServerToolRepo repository.ChatAgentMcpServerToolRepository
+	llmProviderRepo            repository.LlmProviderRepository
 }
 
 // NewChatAgentConversationService 创建 聊天会话 服务实例
@@ -76,19 +84,21 @@ func NewChatAgentConversationService(
 	llmRepo repository.ApplicationLlmRepository,
 	mcpConfigRepo repository.ApplicationMcpServerConfigRepository,
 	mcpToolRepo repository.ApplicationMcpServerToolRepository,
+	chatAgentMcpServerToolRepo repository.ChatAgentMcpServerToolRepository,
 	llmProviderRepo repository.LlmProviderRepository,
 ) ChatAgentConversationService {
 	return &chatAgentConversationService{
-		db:               db,
-		conversationRepo: conversationRepo,
-		messageRepo:      messageRepo,
-		attachmentRepo:   attachmentRepo,
-		chatAgentRepo:    chatAgentRepo,
-		applicationRepo:  applicationRepo,
-		llmRepo:          llmRepo,
-		mcpConfigRepo:    mcpConfigRepo,
-		mcpToolRepo:      mcpToolRepo,
-		llmProviderRepo:  llmProviderRepo,
+		db:                         db,
+		conversationRepo:           conversationRepo,
+		messageRepo:                messageRepo,
+		attachmentRepo:             attachmentRepo,
+		chatAgentRepo:              chatAgentRepo,
+		applicationRepo:            applicationRepo,
+		llmRepo:                    llmRepo,
+		mcpConfigRepo:              mcpConfigRepo,
+		mcpToolRepo:                mcpToolRepo,
+		chatAgentMcpServerToolRepo: chatAgentMcpServerToolRepo,
+		llmProviderRepo:            llmProviderRepo,
 	}
 }
 
@@ -494,7 +504,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 	}
 
 	// 准备工具列表
-	openaiToolsList, err := s.prepareToolsList(ctx, appID, req.UsedMcpToolList, req.UsedInternalToolList)
+	openaiToolsList, err := s.prepareToolsList(ctx, agentID, req.UsedMcpToolList, req.UsedInternalToolList)
 	if err != nil {
 		log.Printf("获取工具列表失败: %v", err)
 		// 工具获取失败不影响主流程，使用空工具列表
@@ -557,7 +567,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 
 	// 交给AI处理消息
 	if streamable {
-		return s.aiProcessStreamable(ctx, appID, agentID, conversationIDStr, requestID, messages, []openai.Tool{}) //openaiToolsList)
+		return s.aiProcessStreamable(ctx, appID, agentID, conversationIDStr, requestID, messages, openaiToolsList) //openaiToolsList)
 	} else {
 		return s.aiProcess(ctx, agentID, conversationIDStr, requestID, messages, openaiToolsList)
 	}
@@ -803,37 +813,11 @@ func (s *chatAgentConversationService) prepareToolsList(ctx context.Context, cha
 	var openaiToolsList []openai.Tool
 
 	// 处理MCP工具
-	for _, mcpTool := range usedMcpToolList {
-		configID, err := uuid.Parse(mcpTool.ApplicationMcpConfigID)
-		if err != nil {
-			log.Printf("无效的MCP配置ID: %s", mcpTool.ApplicationMcpConfigID)
-			continue
-		}
-
-		// 获取MCP工具信息
-		tools, err := s.mcpToolRepo.GetByApplicationMcpServerConfigID(ctx, configID)
-		if err != nil {
-			log.Printf("获取MCP工具失败: %v", err)
-			continue
-		}
-
-		// 查找匹配的工具
-		for _, tool := range tools {
-			if tool.Name == mcpTool.ToolName {
-				// 构建OpenAI工具格式
-				openaiTool := openai.Tool{
-					Type: "function",
-					Function: &openai.FunctionDefinition{
-						Name:        fmt.Sprintf("%s_____%s", mcpTool.ApplicationMcpConfigID, tool.Name),
-						Description: tool.Description,
-						Parameters:  map[string]interface{}{}, // 暂时使用空的参数定义
-					},
-				}
-				openaiToolsList = append(openaiToolsList, openaiTool)
-				break
-			}
-		}
+	mcpTools, err := s.GetChatAgentMcpServerTools(ctx, chatAgentID)
+	if err != nil {
+		return nil, err
 	}
+	openaiToolsList = append(openaiToolsList, mcpTools...)
 
 	// 处理内部工具
 	for _, internalToolName := range usedInternalToolList {
@@ -935,8 +919,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 			Tools:       aiTools,
 			Temperature: 0.01,
 			TopP:        1,
-			ToolChoice:  "none",
-			MaxTokens:   40000,
+			ToolChoice:  "auto",
 		}
 
 		// 创建流式请求
@@ -946,7 +929,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 				ConversationID: conversationID,
 				RequestID:      requestID,
 				MessageType:    "error",
-				Content:        fmt.Sprintf("AI处理出错: %v", err),
+				Content:        fmt.Sprintf("AI Process error: %v", err),
 			}
 			eventJSON, _ := json.Marshal(event)
 			pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
@@ -1400,4 +1383,160 @@ func (s *chatAgentConversationService) getChatAgentNamingLlmConfig(ctx context.C
 	}
 
 	return namingLlmProvider, namingLlm, nil
+}
+
+// GetChatAgentMcpServerTools 获取聊天智能体启用的MCP工具列表
+// 根据chatAgentID查询启用的工具，并从MCP服务器获取最新的工具信息
+func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Context, chatAgentID uuid.UUID) ([]openai.Tool, error) {
+	// 1. 查询该聊天智能体启用的MCP工具配置
+	enabledTools, err := s.chatAgentMcpServerToolRepo.GetByChatAgentID(ctx, chatAgentID)
+	if err != nil {
+		return nil, fmt.Errorf("获取聊天智能体MCP工具配置失败: %w", err)
+	}
+
+	// 过滤出启用的工具
+	var enabledToolIDs []uuid.UUID
+	for _, tool := range enabledTools {
+		if tool.Enabled {
+			enabledToolIDs = append(enabledToolIDs, tool.ApplicationMcpServerToolID)
+		}
+	}
+
+	if len(enabledToolIDs) == 0 {
+		return []openai.Tool{}, nil
+	}
+
+	// 2. 根据工具ID逐个获取工具信息，并按MCP配置分组
+	configToolsMap := make(map[uuid.UUID][]*models.ApplicationMcpServerTool)
+	for _, toolID := range enabledToolIDs {
+		tool, err := s.mcpToolRepo.GetByID(ctx, toolID)
+		if err != nil {
+			log.Printf("获取MCP工具信息失败: %v", err)
+			continue
+		}
+		if tool != nil {
+			configToolsMap[tool.ApplicationMcpServerConfigID] = append(configToolsMap[tool.ApplicationMcpServerConfigID], tool)
+		}
+	}
+
+	var openaiTools []openai.Tool
+
+	// 4. 为每个MCP配置获取最新的工具信息
+	for configID, configTools := range configToolsMap {
+		// 获取MCP配置信息
+		config, err := s.mcpConfigRepo.GetByID(ctx, configID)
+		if err != nil {
+			log.Printf("获取MCP配置失败: %v", err)
+			continue
+		}
+
+		// 从MCP服务器获取最新的工具信息
+		mcpTools, err := s.getToolsFromMcpServer(ctx, config)
+		if err != nil {
+			log.Printf("从MCP服务器获取工具失败: %v", err)
+			continue
+		}
+
+		// 创建工具名称映射
+		mcpToolsMap := make(map[string]mcp.Tool)
+		for _, mcpTool := range mcpTools {
+			mcpToolsMap[mcpTool.Name] = mcpTool
+		}
+
+		// 为每个启用的工具创建OpenAI工具格式
+		for _, tool := range configTools {
+			if mcpTool, exists := mcpToolsMap[tool.Name]; exists {
+				openaiTool := s.convertMcpToolToOpenAI(mcpTool, configID)
+				openaiTools = append(openaiTools, openaiTool)
+			}
+		}
+	}
+
+	return openaiTools, nil
+}
+
+// getToolsFromMcpServer 从MCP服务器获取工具列表
+func (s *chatAgentConversationService) getToolsFromMcpServer(ctx context.Context, config *models.ApplicationMcpServerConfig) ([]mcp.Tool, error) {
+	// 根据连接方式创建MCP客户端
+	var c *client.Client
+	var err error
+
+	switch config.McpServerConnectType {
+	case "streamable-http":
+		httpTransport, err := transport.NewStreamableHTTP(config.McpServerUrl)
+		if err != nil {
+			return nil, fmt.Errorf("创建Streamable HTTP传输失败: %w", err)
+		}
+		c = client.NewClient(httpTransport)
+	case "sse":
+		sse, err := transport.NewSSE(config.McpServerUrl)
+		if err != nil {
+			return nil, fmt.Errorf("创建SSE传输失败: %w", err)
+		}
+		c = client.NewClient(sse)
+	case "stdio":
+		studio := transport.NewStdio(config.McpServerCommand, []string{config.McpServerEnv}, "")
+		c = client.NewClient(studio)
+	default:
+		return nil, fmt.Errorf("不支持的连接方式: %s", config.McpServerConnectType)
+	}
+
+	// 初始化客户端
+	initRequest := mcp.InitializeRequest{}
+	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+	initRequest.Params.ClientInfo = mcp.Implementation{
+		Name:    "Lemon-Tree MCP Client",
+		Version: "1.0.0",
+	}
+	initRequest.Params.Capabilities = mcp.ClientCapabilities{}
+
+	serverInfo, err := c.Initialize(ctx, initRequest)
+	if err != nil {
+		return nil, fmt.Errorf("初始化MCP客户端失败: %w", err)
+	}
+
+	log.Printf("连接到MCP服务器: %s (版本 %s)", serverInfo.ServerInfo.Name, serverInfo.ServerInfo.Version)
+
+	// 健康检查
+	if err := c.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("MCP服务器健康检查失败: %w", err)
+	}
+
+	// 获取工具列表
+	if serverInfo.Capabilities.Tools == nil {
+		log.Println("MCP服务器不支持工具功能")
+		return []mcp.Tool{}, nil
+	}
+
+	toolsRequest := mcp.ListToolsRequest{}
+	toolsResult, err := c.ListTools(ctx, toolsRequest)
+	if err != nil {
+		return nil, fmt.Errorf("获取MCP工具列表失败: %w", err)
+	}
+
+	log.Printf("MCP服务器有 %d 个可用工具", len(toolsResult.Tools))
+	return toolsResult.Tools, nil
+}
+
+// convertMcpToolToOpenAI 将MCP工具转换为OpenAI工具格式
+func (s *chatAgentConversationService) convertMcpToolToOpenAI(mcpTool mcp.Tool, configID uuid.UUID) openai.Tool {
+	// 构建工具名称，格式为: configID_____toolName
+	toolName := fmt.Sprintf("%s_____%s", configID.String(), mcpTool.Name)
+
+	// 转换输入参数schema
+	var parameters map[string]interface{}
+	if mcpTool.InputSchema.Properties != nil {
+		parameters = mcpTool.InputSchema.Properties
+	} else {
+		parameters = make(map[string]interface{})
+	}
+
+	return openai.Tool{
+		Type: "function",
+		Function: &openai.FunctionDefinition{
+			Name:        toolName,
+			Description: mcpTool.Description,
+			Parameters:  parameters,
+		},
+	}
 }
