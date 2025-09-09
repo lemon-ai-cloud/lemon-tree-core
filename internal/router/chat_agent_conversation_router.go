@@ -16,7 +16,7 @@ import (
 func SetupChatAgentConversationRoutes(api *gin.RouterGroup, handler *handler.ChatAgentConversationHandler,
 	chatAgentService service.ChatAgentService, applicationService service.ApplicationService) {
 	// 聊天会话路由组
-	chatAgentConversations := api.Group("/chat-agent-conversations")
+	chatAgentConversations := api.Group("/chat")
 	chatAgentConversations.Use(middleware.ChatAgentAuthMiddleware(chatAgentService, applicationService))
 	{
 		// 获取会话列表

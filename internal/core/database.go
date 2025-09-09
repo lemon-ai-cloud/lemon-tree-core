@@ -66,11 +66,12 @@ func NewDatabase(config *config.Config) (*gorm.DB, error) {
 		&models.ChatAgentAttachment{},                    // 聊天智能体附件表
 		&models.ChatAgentApiKey{},                        // 聊天智能体API Key表
 		&models.ChatConversation{},                       // 聊天会话表
-		&models.LlmProvider{},                            // 大语言模型供应商表
+		&models.ApplicationLlmProvider{},                 // 大语言模型供应商表
 		&models.ApplicationStorageConfig{},               // 应用存储配置表
 		&models.ApplicationInternalToolNetSearchConfig{}, // 应用内部工具网络搜索配置表
 		&models.ApplicationMcpServerConfig{},             // 应用MCP服务器配置表
 		&models.ApplicationMcpServerTool{},               // 应用MCP服务器工具表
+		&models.ChatAgentMcpServerTool{},                 // 聊天智能体MCP服务器工具配置表
 	); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate: %w", err)
 	}

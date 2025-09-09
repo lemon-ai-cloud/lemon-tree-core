@@ -24,6 +24,7 @@ type RouterManager struct {
 	chatAgentConversationHandler      *handler.ChatAgentConversationHandler      // ChatAgentConversation 处理器
 	applicationStorageConfigHandler   *handler.ApplicationStorageConfigHandler   // ApplicationStorageConfig 处理器
 	resourceHandler                   *handler.ResourceHandler                   // Resource 处理器
+	chatAgentMcpServerToolHandler     *handler.ChatAgentMcpServerToolHandler     // ChatAgentMcpServerTool 处理器
 	userService                       service.UserService                        // User 服务
 	chatAgentService                  service.ChatAgentService                   // ChatAgent 服务
 	applicationService                service.ApplicationService                 // Application 服务
@@ -32,8 +33,8 @@ type RouterManager struct {
 
 // NewRouterManager 创建路由管理器实例
 // 返回 RouterManager 的实例
-// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，applicationMcpServerConfigHandler - ApplicationMCP配置 处理器，chatAgentHandler - ChatAgent 处理器，chatAgentConversationHandler - ChatAgentConversation 处理器，applicationStorageConfigHandler - ApplicationStorageConfig 处理器，resourceHandler - Resource 处理器，userService - User 服务，chatAgentService - ChatAgent 服务，applicationService - Application 服务，logger - 日志记录器
-func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler, chatAgentHandler *handler.ChatAgentHandler, chatAgentConversationHandler *handler.ChatAgentConversationHandler, applicationStorageConfigHandler *handler.ApplicationStorageConfigHandler, resourceHandler *handler.ResourceHandler, userService service.UserService, chatAgentService service.ChatAgentService, applicationService service.ApplicationService, logger *zap.Logger) *RouterManager {
+// 参数：appHandler - Application 处理器，userHandler - User 处理器，llmProviderHandler - LlmProvider 处理器，applicationLlmHandler - ApplicationLLM 处理器，applicationMcpServerConfigHandler - ApplicationMCP配置 处理器，chatAgentHandler - ChatAgent 处理器，chatAgentConversationHandler - ChatAgentConversation 处理器，applicationStorageConfigHandler - ApplicationStorageConfig 处理器，resourceHandler - Resource 处理器，chatAgentMcpServerToolHandler - ChatAgentMcpServerTool 处理器，userService - User 服务，chatAgentService - ChatAgent 服务，applicationService - Application 服务，logger - 日志记录器
+func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handler.UserHandler, llmProviderHandler *handler.LlmProviderHandler, applicationLlmHandler *handler.ApplicationLlmHandler, applicationMcpServerConfigHandler *handler.ApplicationMcpServerConfigHandler, chatAgentHandler *handler.ChatAgentHandler, chatAgentConversationHandler *handler.ChatAgentConversationHandler, applicationStorageConfigHandler *handler.ApplicationStorageConfigHandler, resourceHandler *handler.ResourceHandler, chatAgentMcpServerToolHandler *handler.ChatAgentMcpServerToolHandler, userService service.UserService, chatAgentService service.ChatAgentService, applicationService service.ApplicationService, logger *zap.Logger) *RouterManager {
 	return &RouterManager{
 		appHandler:                        appHandler,
 		userHandler:                       userHandler,
@@ -44,6 +45,7 @@ func NewRouterManager(appHandler *handler.ApplicationHandler, userHandler *handl
 		chatAgentConversationHandler:      chatAgentConversationHandler,
 		applicationStorageConfigHandler:   applicationStorageConfigHandler,
 		resourceHandler:                   resourceHandler,
+		chatAgentMcpServerToolHandler:     chatAgentMcpServerToolHandler,
 		userService:                       userService,
 		chatAgentService:                  chatAgentService,
 		applicationService:                applicationService,
@@ -97,6 +99,9 @@ func (rm *RouterManager) SetupAllRoutes() *gin.Engine {
 
 		// 设置 Resource 模块的路由
 		SetupResourceRoutes(api, rm.resourceHandler)
+
+		// 设置 ChatAgentMcpServerTool 模块的路由
+		SetupChatAgentMcpServerToolRoutes(api, rm.chatAgentMcpServerToolHandler, rm.userService)
 
 		// 未来可以在这里添加更多模块的路由
 		// SetupAuthRoutes(api, authHandler)

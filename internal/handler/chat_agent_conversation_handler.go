@@ -43,7 +43,6 @@ func (h *ChatAgentConversationHandler) GetConversationList(c *gin.Context) {
 
 	lastID := c.Query("last_id")
 	sizeStr := c.DefaultQuery("size", "10")
-	sort := c.DefaultQuery("sort", "-created_at")
 
 	// 解析size参数
 	size, err := strconv.Atoi(sizeStr)
@@ -71,7 +70,6 @@ func (h *ChatAgentConversationHandler) GetConversationList(c *gin.Context) {
 		serviceUserID,
 		lastID,
 		size,
-		sort,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -113,7 +111,6 @@ func (h *ChatAgentConversationHandler) GetChatMessageList(c *gin.Context) {
 
 	lastID := c.Query("last_id")
 	sizeStr := c.DefaultQuery("size", "10")
-	sort := c.DefaultQuery("sort", "-created_at")
 
 	// 解析size参数
 	size, err := strconv.Atoi(sizeStr)
@@ -141,7 +138,6 @@ func (h *ChatAgentConversationHandler) GetChatMessageList(c *gin.Context) {
 		conversationID,
 		lastID,
 		size,
-		sort,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

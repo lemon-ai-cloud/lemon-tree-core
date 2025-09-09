@@ -2,12 +2,13 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"lemon-tree-core/internal/base"
+
+	"github.com/google/uuid"
 )
 
-// Application 应用模型结构体
-type LlmProvider struct {
+// ApplicationLlmProvider 应用大预言模型结构体
+type ApplicationLlmProvider struct {
 	base.BaseModel           // 继承基础模型，包含 ID、时间戳等通用字段
 	Name           string    `json:"name" gorm:"type:varchar(64);not null;comment:大语言模型供应商名称"` // 应用名称，最大长度64字符
 	Description    string    `json:"description" gorm:"type:varchar(512);not null;comment:大语言模型供应商描述"`
@@ -20,6 +21,6 @@ type LlmProvider struct {
 
 // TableName 指定数据库表名
 // 返回该模型对应的数据库表名
-func (LlmProvider) TableName() string {
-	return "ltc_llm_provider"
+func (ApplicationLlmProvider) TableName() string {
+	return "ltc_application_llm_provider"
 }

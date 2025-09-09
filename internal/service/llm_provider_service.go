@@ -21,11 +21,11 @@ import (
 type LlmProviderService interface {
 	// GetLlmProviderByID 根据ID获取大语言模型提供商
 	// 根据UUID获取指定的提供商信息
-	GetLlmProviderByID(ctx context.Context, id uuid.UUID) (*models.LlmProvider, error)
+	GetLlmProviderByID(ctx context.Context, id uuid.UUID) (*models.ApplicationLlmProvider, error)
 
 	// SaveLlmProvider 保存大语言模型提供商（新增或更新）
 	// 如果ID为空则新增，否则更新现有记录
-	SaveLlmProvider(ctx context.Context, llmProvider *models.LlmProvider) error
+	SaveLlmProvider(ctx context.Context, llmProvider *models.ApplicationLlmProvider) error
 
 	// DeleteLlmProvider 删除大语言模型提供商
 	// 根据ID删除指定的提供商
@@ -33,15 +33,15 @@ type LlmProviderService interface {
 
 	// GetAllLlmProviders 获取所有大语言模型提供商
 	// 返回所有提供商的列表
-	GetAllLlmProviders(ctx context.Context) ([]*models.LlmProvider, error)
+	GetAllLlmProviders(ctx context.Context) ([]*models.ApplicationLlmProvider, error)
 
 	// QueryLlmProviders 动态查询大语言模型提供商
 	// 根据查询条件动态查询提供商
-	QueryLlmProviders(ctx context.Context, query *models.LlmProvider) ([]*models.LlmProvider, error)
+	QueryLlmProviders(ctx context.Context, query *models.ApplicationLlmProvider) ([]*models.ApplicationLlmProvider, error)
 
 	// GetLlmProvidersByApplicationID 根据应用ID获取大语言模型提供商列表
 	// 返回指定应用下的所有提供商
-	GetLlmProvidersByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.LlmProvider, error)
+	GetLlmProvidersByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.ApplicationLlmProvider, error)
 }
 
 // llmProviderService 大语言模型提供商业务逻辑层实现
@@ -64,19 +64,19 @@ func NewLlmProviderService(llmProviderRepo repository.LlmProviderRepository, app
 
 // GetLlmProviderByID 根据ID获取大语言模型提供商
 // 根据UUID获取指定的提供商信息
-func (s *llmProviderService) GetLlmProviderByID(ctx context.Context, id uuid.UUID) (*models.LlmProvider, error) {
+func (s *llmProviderService) GetLlmProviderByID(ctx context.Context, id uuid.UUID) (*models.ApplicationLlmProvider, error) {
 	return s.llmProviderRepo.GetByID(ctx, id)
 }
 
 // QueryLlmProviders 动态查询大语言模型提供商
 // 根据查询条件动态查询提供商
-func (s *llmProviderService) QueryLlmProviders(ctx context.Context, query *models.LlmProvider) ([]*models.LlmProvider, error) {
+func (s *llmProviderService) QueryLlmProviders(ctx context.Context, query *models.ApplicationLlmProvider) ([]*models.ApplicationLlmProvider, error) {
 	return s.llmProviderRepo.Query(ctx, query)
 }
 
 // SaveLlmProvider 保存大语言模型提供商（新增或更新）
 // 如果ID为空则新增，否则更新现有记录
-func (s *llmProviderService) SaveLlmProvider(ctx context.Context, llmProvider *models.LlmProvider) error {
+func (s *llmProviderService) SaveLlmProvider(ctx context.Context, llmProvider *models.ApplicationLlmProvider) error {
 	// 数据验证
 	if err := s.validateLlmProvider(llmProvider); err != nil {
 		return err
@@ -137,19 +137,19 @@ func (s *llmProviderService) DeleteLlmProvider(ctx context.Context, id uuid.UUID
 
 // GetAllLlmProviders 获取所有大语言模型提供商
 // 返回所有提供商的列表
-func (s *llmProviderService) GetAllLlmProviders(ctx context.Context) ([]*models.LlmProvider, error) {
+func (s *llmProviderService) GetAllLlmProviders(ctx context.Context) ([]*models.ApplicationLlmProvider, error) {
 	return s.llmProviderRepo.ListAll(ctx)
 }
 
 // GetLlmProvidersByApplicationID 根据应用ID获取大语言模型提供商列表
 // 返回指定应用下的所有提供商
-func (s *llmProviderService) GetLlmProvidersByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.LlmProvider, error) {
+func (s *llmProviderService) GetLlmProvidersByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.ApplicationLlmProvider, error) {
 	return s.llmProviderRepo.GetByApplicationID(ctx, applicationID)
 }
 
 // validateLlmProvider 验证大语言模型提供商数据
 // 检查必填字段是否为空
-func (s *llmProviderService) validateLlmProvider(llmProvider *models.LlmProvider) error {
+func (s *llmProviderService) validateLlmProvider(llmProvider *models.ApplicationLlmProvider) error {
 	if llmProvider == nil {
 		return fmt.Errorf("提供商不能为空")
 	}
@@ -188,7 +188,7 @@ func (s *llmProviderService) validateLlmProvider(llmProvider *models.LlmProvider
 // handleIconSave 处理图标保存
 // 如果 IconUrl 是 base64 格式，则保存为本地文件并更新为相对路径
 // 如果 IconUrl 不是 base64 格式，则保持原内容不变
-func (s *llmProviderService) handleIconSave(llmProvider *models.LlmProvider) error {
+func (s *llmProviderService) handleIconSave(llmProvider *models.ApplicationLlmProvider) error {
 	// 检查是否是 base64 格式
 	if !strings.HasPrefix(llmProvider.IconUrl, "data:image/") {
 		return nil // 不是 base64 格式，保持原内容不变

@@ -17,7 +17,7 @@ import (
 type ApplicationLlmService interface {
 	// FetchAndSaveModels 获取并保存所有模型
 	// 从指定的 LLM 提供商获取模型列表并保存到数据库
-	FetchAndSaveModels(ctx context.Context, llmProvider *models.LlmProvider) error
+	FetchAndSaveModels(ctx context.Context, llmProvider *models.ApplicationLlmProvider) error
 
 	// SaveApplicationLlm 保存应用模型信息
 	// 如果ID为空则新增，否则更新现有记录
@@ -53,7 +53,7 @@ func NewApplicationLlmService(applicationLlmRepo repository.ApplicationLlmReposi
 
 // FetchAndSaveModels 获取并保存所有模型
 // 从指定的 LLM 提供商获取模型列表并保存到数据库
-func (s *applicationLlmService) FetchAndSaveModels(ctx context.Context, llmProvider *models.LlmProvider) error {
+func (s *applicationLlmService) FetchAndSaveModels(ctx context.Context, llmProvider *models.ApplicationLlmProvider) error {
 	// 检查提供商是否有必要的配置
 	if llmProvider.ApiUrl == "" || llmProvider.ApiKey == "" {
 		return fmt.Errorf("提供商缺少必要的配置信息")

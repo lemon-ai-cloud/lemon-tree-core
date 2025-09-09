@@ -51,6 +51,7 @@ func NewContainer() *fx.App {
 			repository.NewApplicationInternalToolNetSearchConfigRepository, // 创建 ApplicationInternalToolNetSearchConfig Repository
 			repository.NewApplicationMcpServerConfigRepository,             // 创建 ApplicationMcpServerConfig Repository
 			repository.NewApplicationMcpServerToolRepository,               // 创建 ApplicationMcpServerTool Repository
+			repository.NewChatAgentMcpServerToolRepository,                 // 创建 ChatAgentMcpServerTool Repository
 		),
 
 		// Service 层提供者（Service Providers）
@@ -76,6 +77,7 @@ func NewContainer() *fx.App {
 				llmRepo repository.ApplicationLlmRepository,
 				mcpConfigRepo repository.ApplicationMcpServerConfigRepository,
 				mcpToolRepo repository.ApplicationMcpServerToolRepository,
+				llmProviderRepo repository.LlmProviderRepository,
 			) service.ChatAgentConversationService {
 				return service.NewChatAgentConversationService(
 					db,
@@ -87,6 +89,7 @@ func NewContainer() *fx.App {
 					llmRepo,
 					mcpConfigRepo,
 					mcpToolRepo,
+					llmProviderRepo,
 				)
 			},
 			// 未来可以在这里添加更多 Service
@@ -98,6 +101,20 @@ func NewContainer() *fx.App {
 			// LlmProviderService 需要 ApplicationLlmService，所以单独提供
 			func(applicationLlmService service.ApplicationLlmService, llmProviderRepo repository.LlmProviderRepository) service.LlmProviderService {
 				return service.NewLlmProviderService(llmProviderRepo, applicationLlmService)
+			},
+			// ChatAgentMcpServerToolService 需要多个 repository，所以单独提供
+			func(
+				chatAgentMcpServerToolRepo repository.ChatAgentMcpServerToolRepository,
+				applicationMcpServerToolRepo repository.ApplicationMcpServerToolRepository,
+				applicationMcpServerConfigRepo repository.ApplicationMcpServerConfigRepository,
+				chatAgentRepo repository.ChatAgentRepository,
+			) service.ChatAgentMcpServerToolService {
+				return service.NewChatAgentMcpServerToolService(
+					chatAgentMcpServerToolRepo,
+					applicationMcpServerToolRepo,
+					applicationMcpServerConfigRepo,
+					chatAgentRepo,
+				)
 			},
 		),
 
@@ -116,6 +133,7 @@ func NewContainer() *fx.App {
 			handler.NewChatAgentConversationHandler,      // 创建 ChatAgentConversation Handler
 			handler.NewApplicationStorageConfigHandler,   // 创建 ApplicationStorageConfig Handler
 			handler.NewResourceHandler,                   // 创建 Resource Handler
+			handler.NewChatAgentMcpServerToolHandler,     // 创建 ChatAgentMcpServerTool Handler
 			// 未来可以在这里添加更多 Handler
 			// handler.NewOrderHandler,
 		),

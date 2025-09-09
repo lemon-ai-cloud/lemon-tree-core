@@ -32,6 +32,7 @@ type chatAgentApiKeyRepository struct {
 func NewChatAgentApiKeyRepository(db *gorm.DB) ChatAgentApiKeyRepository {
 	return &chatAgentApiKeyRepository{
 		BaseRepository: base.NewBaseRepository[models.ChatAgentApiKey](db),
+		db:             db,
 	}
 }
 

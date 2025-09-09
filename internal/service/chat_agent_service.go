@@ -41,9 +41,10 @@ type chatAgentService struct {
 // NewChatAgentService 创建 智能体 服务实例
 // 返回 ChatAgentService 接口的实现
 // 参数：chatAgentRepo - 智能体 数据访问层接口
-func NewChatAgentService(chatAgentRepo repository.ChatAgentRepository) ChatAgentService {
+func NewChatAgentService(chatAgentRepo repository.ChatAgentRepository, chatAgentApiKeyRepo repository.ChatAgentApiKeyRepository) ChatAgentService {
 	return &chatAgentService{
-		chatAgentRepo: chatAgentRepo,
+		chatAgentRepo:       chatAgentRepo,
+		chatAgentApiKeyRepo: chatAgentApiKeyRepo,
 	}
 }
 

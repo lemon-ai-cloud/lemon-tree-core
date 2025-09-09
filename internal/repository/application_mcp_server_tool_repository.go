@@ -36,6 +36,9 @@ type ApplicationMcpServerToolRepository interface {
 
 	// BatchCreate 批量创建工具记录
 	BatchCreate(ctx context.Context, tools []*models.ApplicationMcpServerTool) error
+
+	// GetByApplicationID 根据应用ID获取所有MCP工具
+	GetByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.ApplicationMcpServerTool, error)
 }
 
 // applicationMcpServerToolRepository ApplicationMCP工具 数据访问层实现
@@ -133,4 +136,17 @@ func (r *applicationMcpServerToolRepository) BatchCreate(ctx context.Context, to
 		return nil
 	}
 	return r.db.WithContext(ctx).CreateInBatches(tools, 100).Error
+}
+
+// GetByApplicationID 根据应用ID获取所有MCP工具
+// 从数据库中查询指定应用下的所有MCP工具
+// 参数：ctx - 上下文，applicationID - 应用ID
+// 返回：工具列表和错误信息
+func (r *applicationMcpServerToolRepository) GetByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.ApplicationMcpServerTool, error) {
+	var tools []*models.ApplicationMcpServerTool
+	err := r.db.WithContext(ctx).Where("application_id = ?", applicationID).Find(&tools).Error
+	if err != nil {
+		return nil, err
+	}
+	return tools, nil
 }
