@@ -1525,14 +1525,6 @@ func (s *chatAgentConversationService) convertMcpToolToOpenAI(mcpTool mcp.Tool, 
 	// 构建工具名称，格式为: configID_____toolName
 	toolName := fmt.Sprintf("%s_____%s", configID, mcpTool.Name)
 
-	// 转换输入参数schema
-	//var parameters map[string]interface{}
-	//if mcpTool.InputSchema.Properties != nil {
-	//	parameters = mcpTool.InputSchema.Properties
-	//} else {
-	//	parameters = make(map[string]interface{})
-	//}
-
 	return openai.Tool{
 		Type: "function",
 		Function: &openai.FunctionDefinition{
