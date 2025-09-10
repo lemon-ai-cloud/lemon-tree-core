@@ -38,57 +38,57 @@ type FunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
-// ChatCompletionRequest 聊天完成请求结构
-type ChatCompletionRequest struct {
+// SendMessageRequest 聊天完成请求结构
+type SendMessageRequest struct {
 	Model       string        `json:"model"`
 	Messages    []ChatMessage `json:"messages"`
 	Stream      bool          `json:"stream"`
 	Tools       []Tool        `json:"tools,omitempty"`
-	Temperature float32       `json:"temperature,omitempty"`
-	TopP        float32       `json:"top_p,omitempty"`
+	Temperature float64       `json:"temperature,omitempty"`
+	TopP        float64       `json:"top_p,omitempty"`
 	ToolChoice  string        `json:"tool_choice,omitempty"`
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 }
 
-// ChatCompletionResponse 聊天完成响应结构
-type ChatCompletionResponse struct {
-	Choices []ChatCompletionChoice `json:"choices"`
+// SendMessageResponse 聊天完成响应结构
+type SendMessageResponse struct {
+	Choices []SendMessageChoice `json:"choices"`
 }
 
-// ChatCompletionChoice 聊天完成选择结构
-type ChatCompletionChoice struct {
+// SendMessageChoice 聊天完成选择结构
+type SendMessageChoice struct {
 	Message      ChatMessage `json:"message"`
 	FinishReason string      `json:"finish_reason"`
 }
 
-// ChatCompletionStreamResponse 流式聊天完成响应结构
-type ChatCompletionStreamResponse struct {
-	Choices []ChatCompletionStreamChoice `json:"choices"`
+// SendMessageStreamResponse 流式聊天完成响应结构
+type SendMessageStreamResponse struct {
+	Choices []SendMessageStreamChoice `json:"choices"`
 }
 
-// ChatCompletionStreamChoice 流式聊天完成选择结构
-type ChatCompletionStreamChoice struct {
-	Delta        ChatCompletionStreamDelta `json:"delta"`
-	FinishReason string                    `json:"finish_reason"`
+// SendMessageStreamChoice 流式聊天完成选择结构
+type SendMessageStreamChoice struct {
+	Delta        SendMessageStreamDelta `json:"delta"`
+	FinishReason string                 `json:"finish_reason"`
 }
 
-// ChatCompletionStreamDelta 流式聊天完成增量结构
-type ChatCompletionStreamDelta struct {
+// SendMessageStreamDelta 流式聊天完成增量结构
+type SendMessageStreamDelta struct {
 	Content   string     `json:"content"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
-// ChatCompletionStream 流式聊天完成接口
-type ChatCompletionStream interface {
-	Recv() (*ChatCompletionStreamResponse, error)
+// SendMessageStream 流式聊天完成接口
+type SendMessageStream interface {
+	Recv() (*SendMessageStreamResponse, error)
 	Close()
 }
 
 // LemonAiClient AI客户端接口
 type LemonAiClient interface {
 	// SendMessage 发送消息
-	SendMessage(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error)
+	SendMessage(ctx context.Context, req SendMessageRequest) (*SendMessageResponse, error)
 
 	// SendMessageStream 发送流式消息
-	SendMessageStream(ctx context.Context, req ChatCompletionRequest) (ChatCompletionStream, error)
+	SendMessageStream(ctx context.Context, req SendMessageRequest) (SendMessageStream, error)
 }

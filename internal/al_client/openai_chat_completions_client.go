@@ -19,15 +19,15 @@ func NewOpenAIChatCompletionsClient(apiKey string) *OpenAIChatCompletionsClient 
 }
 
 // SendMessage 发送消息
-func (c *OpenAIChatCompletionsClient) SendMessage(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
+func (c *OpenAIChatCompletionsClient) SendMessage(ctx context.Context, req SendMessageRequest) (*SendMessageResponse, error) {
 	// 转换请求格式
 	openaiReq := openai.ChatCompletionRequest{
 		Model:       req.Model,
 		Messages:    convertToOpenAIMessages(req.Messages),
 		Stream:      req.Stream,
 		Tools:       convertToOpenAITools(req.Tools),
-		Temperature: req.Temperature,
-		TopP:        req.TopP,
+		Temperature: float32(req.Temperature),
+		TopP:        float32(req.TopP),
 		ToolChoice:  req.ToolChoice,
 		MaxTokens:   req.MaxTokens,
 	}
@@ -39,21 +39,21 @@ func (c *OpenAIChatCompletionsClient) SendMessage(ctx context.Context, req ChatC
 	}
 
 	// 转换响应格式
-	return &ChatCompletionResponse{
+	return &SendMessageResponse{
 		Choices: convertToLemonChoices(response.Choices),
 	}, nil
 }
 
 // SendMessageStream 发送流式消息
-func (c *OpenAIChatCompletionsClient) SendMessageStream(ctx context.Context, req ChatCompletionRequest) (ChatCompletionStream, error) {
+func (c *OpenAIChatCompletionsClient) SendMessageStream(ctx context.Context, req SendMessageRequest) (SendMessageStream, error) {
 	// 转换请求格式
 	openaiReq := openai.ChatCompletionRequest{
 		Model:       req.Model,
 		Messages:    convertToOpenAIMessages(req.Messages),
 		Stream:      req.Stream,
 		Tools:       convertToOpenAITools(req.Tools),
-		Temperature: req.Temperature,
-		TopP:        req.TopP,
+		Temperature: float32(req.Temperature),
+		TopP:        float32(req.TopP),
 		ToolChoice:  req.ToolChoice,
 		MaxTokens:   req.MaxTokens,
 	}
@@ -74,13 +74,13 @@ type OpenAIStreamWrapper struct {
 }
 
 // Recv 接收流式数据
-func (w *OpenAIStreamWrapper) Recv() (*ChatCompletionStreamResponse, error) {
+func (w *OpenAIStreamWrapper) Recv() (*SendMessageStreamResponse, error) {
 	chunk, err := w.stream.Recv()
 	if err != nil {
 		return nil, err
 	}
 
-	return &ChatCompletionStreamResponse{
+	return &SendMessageStreamResponse{
 		Choices: convertToLemonStreamChoices(chunk.Choices),
 	}, nil
 }
@@ -133,8 +133,8 @@ func convertToOpenAITools(tools []Tool) []openai.Tool {
 }
 
 // convertToLemonChoices 转换选择格式
-func convertToLemonChoices(choices []openai.ChatCompletionChoice) []ChatCompletionChoice {
-	lemonChoices := make([]ChatCompletionChoice, len(choices))
+func convertToLemonChoices(choices []openai.ChatCompletionChoice) []SendMessageChoice {
+	lemonChoices := make([]SendMessageChoice, len(choices))
 	for i, choice := range choices {
 		lemonMsg := ChatMessage{
 			Role:    choice.Message.Role,
@@ -151,7 +151,7 @@ func convertToLemonChoices(choices []openai.ChatCompletionChoice) []ChatCompleti
 			lemonMsg.ToolCallID = choice.Message.ToolCallID
 		}
 
-		lemonChoices[i] = ChatCompletionChoice{
+		lemonChoices[i] = SendMessageChoice{
 			Message:      lemonMsg,
 			FinishReason: string(choice.FinishReason),
 		}
@@ -160,11 +160,11 @@ func convertToLemonChoices(choices []openai.ChatCompletionChoice) []ChatCompleti
 }
 
 // convertToLemonStreamChoices 转换流式选择格式
-func convertToLemonStreamChoices(choices []openai.ChatCompletionStreamChoice) []ChatCompletionStreamChoice {
-	lemonChoices := make([]ChatCompletionStreamChoice, len(choices))
+func convertToLemonStreamChoices(choices []openai.ChatCompletionStreamChoice) []SendMessageStreamChoice {
+	lemonChoices := make([]SendMessageStreamChoice, len(choices))
 	for i, choice := range choices {
-		lemonChoices[i] = ChatCompletionStreamChoice{
-			Delta: ChatCompletionStreamDelta{
+		lemonChoices[i] = SendMessageStreamChoice{
+			Delta: SendMessageStreamDelta{
 				Content:   choice.Delta.Content,
 				ToolCalls: convertToLemonToolCalls(choice.Delta.ToolCalls),
 			},

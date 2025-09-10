@@ -930,13 +930,13 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 		}
 
 		// 构建请求
-		req := al_client.ChatCompletionRequest{
+		req := al_client.SendMessageRequest{
 			Model:       llm.Name,
 			Messages:    messages,
 			Stream:      true,
 			Tools:       aiTools,
-			Temperature: 0.01,
-			TopP:        1,
+			Temperature: chatAgent.ModelParamTemperature,
+			TopP:        chatAgent.ModelParamTopP,
 			ToolChoice:  "auto",
 		}
 
@@ -1203,15 +1203,15 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversati
 		}
 
 		// 构建请求
-		req := al_client.ChatCompletionRequest{
+		req := al_client.SendMessageRequest{
 			Model:       llm.Name,
 			Messages:    messages,
 			Stream:      false,
 			Tools:       aiTools,
-			Temperature: 0.01,
-			TopP:        1,
+			Temperature: chatAgent.ModelParamTemperature,
+			TopP:        chatAgent.ModelParamTopP,
 			ToolChoice:  "auto",
-			MaxTokens:   40000,
+			MaxTokens:   chatAgent.MaxOutputTokenCountLimit,
 		}
 
 		// 发送请求
