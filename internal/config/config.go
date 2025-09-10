@@ -12,10 +12,11 @@ import (
 )
 
 // Config 应用程序的主配置结构体
-// 包含服务器配置和数据库配置
+// 包含服务器配置、数据库配置和AI客户端配置
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`   // 服务器配置
 	Database DatabaseConfig `mapstructure:"database"` // 数据库配置
+	AI       AIConfig       `mapstructure:"ai"`       // AI客户端配置
 }
 
 // ServerConfig 服务器配置结构体
@@ -34,6 +35,15 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"` // 数据库密码
 	Database string `mapstructure:"database"` // 数据库名称
 	Charset  string `mapstructure:"charset"`  // 数据库字符集
+}
+
+// AIConfig AI客户端配置结构体
+// 定义AI客户端的相关参数
+type AIConfig struct {
+	Type    string `mapstructure:"type"`     // AI客户端类型，如 "openai", "ollama"
+	APIKey  string `mapstructure:"api_key"`  // API密钥
+	BaseURL string `mapstructure:"base_url"` // 基础URL（可选）
+	Model   string `mapstructure:"model"`    // 模型名称（可选）
 }
 
 // AppConfig 全局配置变量
@@ -72,6 +82,12 @@ func LoadConfig() *Config {
 			Database: getEnv("DB_DATABASE", "lemon_tree_core"),
 			Charset:  getEnv("DB_CHARSET", "utf8mb4"),
 		},
+		AI: AIConfig{
+			Type:    getEnv("AI_TYPE", "openai"),
+			APIKey:  getEnv("AI_API_KEY", ""),
+			BaseURL: getEnv("AI_BASE_URL", ""),
+			Model:   getEnv("AI_MODEL", ""),
+		},
 	}
 
 	return AppConfig
@@ -90,6 +106,12 @@ func setDefaults() {
 	viper.SetDefault("database.password", "")
 	viper.SetDefault("database.database", "lemon_tree_core")
 	viper.SetDefault("database.charset", "utf8mb4")
+
+	// AI客户端默认配置
+	viper.SetDefault("ai.type", "openai")
+	viper.SetDefault("ai.api_key", "")
+	viper.SetDefault("ai.base_url", "")
+	viper.SetDefault("ai.model", "")
 }
 
 // getEnv 获取环境变量，如果不存在则返回默认值

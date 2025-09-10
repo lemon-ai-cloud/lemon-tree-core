@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"lemon-tree-core/internal/al_client"
 	"lemon-tree-core/internal/define"
 	"lemon-tree-core/internal/dto"
 	"lemon-tree-core/internal/manager"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/sashabaranov/go-openai"
 	"gorm.io/gorm"
 )
 
@@ -53,7 +53,7 @@ type ChatAgentConversationService interface {
 
 	// GetChatAgentMcpServerTools 获取聊天智能体启用的MCP工具列表
 	// 根据chatAgentID查询启用的工具，并从MCP服务器获取最新的工具信息
-	GetChatAgentMcpServerTools(ctx context.Context) ([]openai.Tool, error)
+	GetChatAgentMcpServerTools(ctx context.Context) ([]al_client.Tool, error)
 }
 
 // chatAgentConversationService 聊天会话 业务逻辑层实现
@@ -322,7 +322,7 @@ func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx conte
 	// 如果conversation_id为空，则认为是新的会话
 	var conversation *models.ChatAgentConversation
 	var conversationIDStr string
-	var historyMessages []openai.ChatCompletionMessage
+	var historyMessages []al_client.ChatMessage
 
 	if req.ConversationID == nil {
 		// 创建新会话
@@ -355,12 +355,15 @@ func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx conte
 			}
 
 			// 构建历史消息列表（为将来的AI对话功能预留）
-			historyMessages = make([]openai.ChatCompletionMessage, 0, len(messageList))
+			historyMessages = make([]al_client.ChatMessage, 0, len(messageList))
 			for _, messageItem := range messageList {
-				historyMessages = append(historyMessages, openai.ChatCompletionMessage{
-					Role:    messageItem.Role,
-					Content: messageItem.Content,
-				})
+				// 只处理普通消息类型，跳过函数调用相关消息
+				if messageItem.Type == "message" && messageItem.Role != "" {
+					historyMessages = append(historyMessages, al_client.ChatMessage{
+						Role:    messageItem.Role,
+						Content: messageItem.Content,
+					})
+				}
 			}
 			// 暂时使用historyMessages变量以避免编译器警告（将来AI对话功能会使用）
 			_ = len(historyMessages)
@@ -456,7 +459,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 	// 如果conversation_id为空，则认为是新的会话
 	var conversation *models.ChatAgentConversation
 	var conversationIDStr string
-	var historyMessages []openai.ChatCompletionMessage
+	var historyMessages []al_client.ChatMessage
 
 	if req.ConversationID == nil || *req.ConversationID == "" {
 		// 创建新会话
@@ -489,12 +492,15 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 			}
 
 			// 构建历史消息列表
-			historyMessages = make([]openai.ChatCompletionMessage, 0, len(messageList))
+			historyMessages = make([]al_client.ChatMessage, 0, len(messageList))
 			for _, messageItem := range messageList {
-				historyMessages = append(historyMessages, openai.ChatCompletionMessage{
-					Role:    messageItem.Role,
-					Content: messageItem.Content,
-				})
+				// 只处理普通消息类型，跳过函数调用相关消息
+				if messageItem.Type == "message" && messageItem.Role != "" {
+					historyMessages = append(historyMessages, al_client.ChatMessage{
+						Role:    messageItem.Role,
+						Content: messageItem.Content,
+					})
+				}
 			}
 		}
 	}
@@ -508,7 +514,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 	if err != nil {
 		log.Printf("获取工具列表失败: %v", err)
 		// 工具获取失败不影响主流程，使用空工具列表
-		openaiToolsList = []openai.Tool{}
+		openaiToolsList = []al_client.Tool{}
 	}
 
 	// 生成请求id
@@ -546,10 +552,10 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 	}
 
 	// 构建完整的消息列表
-	messages := make([]openai.ChatCompletionMessage, 0, len(historyMessages)+2)
+	messages := make([]al_client.ChatMessage, 0, len(historyMessages)+2)
 
 	// 添加系统提示词
-	messages = append(messages, openai.ChatCompletionMessage{
+	messages = append(messages, al_client.ChatMessage{
 		Role:    "system",
 		Content: req.SystemPrompt,
 	})
@@ -558,7 +564,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 	messages = append(messages, historyMessages...)
 
 	// 添加当前用户消息（包含附件信息）
-	messages = append(messages, openai.ChatCompletionMessage{
+	messages = append(messages, al_client.ChatMessage{
 		Role:    "user",
 		Content: attachmentsPrompt + req.UserMessage,
 	})
@@ -809,9 +815,9 @@ func getMimeType(ext string) string {
 }
 
 // prepareToolsList 准备工具列表
-func (s *chatAgentConversationService) prepareToolsList(ctx context.Context, usedMcpToolList []dto.ChatMessageUseToolDto, usedInternalToolList []string) ([]openai.Tool, error) {
+func (s *chatAgentConversationService) prepareToolsList(ctx context.Context, usedMcpToolList []dto.ChatMessageUseToolDto, usedInternalToolList []string) ([]al_client.Tool, error) {
 	//_, chatAgent, err := getContextInfo(ctx)
-	var openaiToolsList []openai.Tool
+	var openaiToolsList []al_client.Tool
 
 	// 处理MCP工具
 	mcpTools, err := s.GetChatAgentMcpServerTools(ctx)
@@ -824,9 +830,9 @@ func (s *chatAgentConversationService) prepareToolsList(ctx context.Context, use
 	for _, internalToolName := range usedInternalToolList {
 		// 这里需要根据实际的内部工具实现来构建工具定义
 		// 暂时使用简单的实现
-		openaiTool := openai.Tool{
+		openaiTool := al_client.Tool{
 			Type: "function",
-			Function: &openai.FunctionDefinition{
+			Function: &al_client.FunctionDefinition{
 				Name:        fmt.Sprintf("__lai__%s", internalToolName),
 				Description: fmt.Sprintf("内部工具: %s", internalToolName),
 				Parameters: map[string]interface{}{
@@ -883,7 +889,7 @@ func (s *chatAgentConversationService) processMessageAttachments(ctx context.Con
 }
 
 // aiProcessStreamable 处理AI消息 - 流式调用AI
-func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, conversationID, requestID string, messages []openai.ChatCompletionMessage, aiTools []openai.Tool) (io.Reader, error) {
+func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, conversationID, requestID string, messages []al_client.ChatMessage, aiTools []al_client.Tool) (io.Reader, error) {
 	// 从上下文中获取ChatAgentID
 	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
@@ -895,7 +901,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 	go func() {
 		defer pw.Close()
 
-		// 获取应用配置和OpenAI客户端
+		// 获取应用配置
 		llmProvider, llm, err := s.getChatAgentChatLlmConfig(ctx)
 		if err != nil {
 			event := dto.ChatMessageResponseEventDto{
@@ -909,11 +915,22 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 			return
 		}
 
-		// 创建OpenAI客户端
-		client := openai.NewClient(llmProvider.ApiKey)
+		// 动态创建AI客户端
+		aiClient, err := s.createAIClient(llmProvider)
+		if err != nil {
+			event := dto.ChatMessageResponseEventDto{
+				ConversationID: conversationID,
+				RequestID:      requestID,
+				MessageType:    "error",
+				Content:        fmt.Sprintf("创建AI客户端失败: %v", err),
+			}
+			eventJSON, _ := json.Marshal(event)
+			pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
+			return
+		}
 
 		// 构建请求
-		req := openai.ChatCompletionRequest{
+		req := al_client.ChatCompletionRequest{
 			Model:       llm.Name,
 			Messages:    messages,
 			Stream:      true,
@@ -924,7 +941,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 		}
 
 		// 创建流式请求
-		stream, err := client.CreateChatCompletionStream(ctx, req)
+		stream, err := aiClient.SendMessageStream(ctx, req)
 		if err != nil {
 			event := dto.ChatMessageResponseEventDto{
 				ConversationID: conversationID,
@@ -939,8 +956,8 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 		defer stream.Close()
 
 		isNeedAiProcessContinue := false
-		finalToolCalls := make(map[string]openai.ToolCall)
-		currentToolCall := openai.ToolCall{}
+		finalToolCalls := make(map[string]al_client.ToolCall)
+		currentToolCall := al_client.ToolCall{}
 		currentToolCallID := ""
 		answerFullContent := ""
 
@@ -966,10 +983,10 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 				for _, toolCall := range choice.Delta.ToolCalls {
 					if toolCall.ID != "" {
 						currentToolCallID = toolCall.ID
-						currentToolCall = openai.ToolCall{
+						currentToolCall = al_client.ToolCall{
 							ID:   toolCall.ID,
 							Type: toolCall.Type,
-							Function: openai.FunctionCall{
+							Function: al_client.FunctionCall{
 								Name:      toolCall.Function.Name,
 								Arguments: toolCall.Function.Arguments,
 							},
@@ -1108,11 +1125,12 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 			pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
 
 			// 更新消息列表，添加工具调用和结果
-			messages = append(messages, openai.ChatCompletionMessage{
+			messages = append(messages, al_client.ChatMessage{
 				Role:      "assistant",
-				ToolCalls: []openai.ToolCall{toolCall},
+				Content:   "",
+				ToolCalls: []al_client.ToolCall{toolCall},
 			})
-			messages = append(messages, openai.ChatCompletionMessage{
+			messages = append(messages, al_client.ChatMessage{
 				Role:       "tool",
 				Content:    toolResult,
 				ToolCallID: toolCall.ID,
@@ -1144,7 +1162,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 }
 
 // aiProcess 处理AI消息 - 非流式调用AI
-func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversationID, requestID string, messages []openai.ChatCompletionMessage, aiTools []openai.Tool) (io.Reader, error) {
+func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversationID, requestID string, messages []al_client.ChatMessage, aiTools []al_client.Tool) (io.Reader, error) {
 	// 从上下文中获取ChatAgentID
 	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
@@ -1156,7 +1174,7 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversati
 	go func() {
 		defer pw.Close()
 
-		// 获取应用配置和OpenAI客户端
+		// 获取应用配置
 		llmProvider, llm, err := s.getChatAgentChatLlmConfig(ctx)
 		if err != nil {
 			event := dto.ChatMessageResponseEventDto{
@@ -1170,11 +1188,22 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversati
 			return
 		}
 
-		// 创建OpenAI客户端
-		client := openai.NewClient(llmProvider.ApiKey)
+		// 动态创建AI客户端
+		aiClient, err := s.createAIClient(llmProvider)
+		if err != nil {
+			event := dto.ChatMessageResponseEventDto{
+				ConversationID: conversationID,
+				RequestID:      requestID,
+				MessageType:    "error",
+				Content:        fmt.Sprintf("创建AI客户端失败: %v", err),
+			}
+			eventJSON, _ := json.Marshal(event)
+			pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
+			return
+		}
 
 		// 构建请求
-		req := openai.ChatCompletionRequest{
+		req := al_client.ChatCompletionRequest{
 			Model:       llm.Name,
 			Messages:    messages,
 			Stream:      false,
@@ -1186,7 +1215,7 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversati
 		}
 
 		// 发送请求
-		response, err := client.CreateChatCompletion(ctx, req)
+		response, err := aiClient.SendMessage(ctx, req)
 		if err != nil {
 			event := dto.ChatMessageResponseEventDto{
 				ConversationID: conversationID,
@@ -1206,49 +1235,57 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversati
 			for _, toolCall := range response.Choices[0].Message.ToolCalls {
 				isNeedAiProcessContinue = true
 
-				// 保存工具调用消息到数据库
-				functionCallMessageObj := &models.ChatAgentMessage{
-					ApplicationID:         application.ID,
-					ChatAgentID:           chatAgent.ID,
-					ConversationID:        uuid.MustParse(conversationID),
-					RequestID:             requestID,
-					Type:                  "function_call",
-					FunctionCallID:        toolCall.ID,
-					FunctionCallName:      toolCall.Function.Name,
-					FunctionCallArguments: toolCall.Function.Arguments,
+				// 告诉调用者，有工具调用
+				event := dto.ChatMessageResponseEventDto{
+					ConversationID: conversationID,
+					RequestID:      requestID,
+					MessageType:    "tool_call",
+					Content:        fmt.Sprintf("调用工具: %s", toolCall.Function.Name),
+					ToolCall: &dto.ToolCallDto{
+						ID:   toolCall.ID,
+						Type: toolCall.Type,
+						Function: dto.FunctionCallDto{
+							Name:      toolCall.Function.Name,
+							Arguments: toolCall.Function.Arguments,
+						},
+					},
 				}
-				if err := s.messageRepo.Create(ctx, functionCallMessageObj); err != nil {
-					log.Printf("保存工具调用消息失败: %v", err)
-				}
+				eventJSON, _ := json.Marshal(event)
+				pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
 
 				// 调用工具
 				toolResult, err := s.callTool(ctx, chatAgent.ID, toolCall)
 				if err != nil {
 					log.Printf("调用工具失败: %v", err)
-					toolResult = "调用工具失败"
+					toolResult = fmt.Sprintf("工具调用失败: %v", err)
 				}
 
-				// 保存工具调用结果到数据库
-				functionCallOutputMessageObj := &models.ChatAgentMessage{
-					ApplicationID:      application.ID,
-					ChatAgentID:        chatAgent.ID,
-					ConversationID:     uuid.MustParse(conversationID),
-					RequestID:          requestID,
-					Type:               "function_call_output",
-					FunctionCallID:     toolCall.ID,
-					FunctionCallName:   toolCall.Function.Name,
-					FunctionCallOutput: toolResult,
+				// 告诉调用者，工具调用完成
+				event = dto.ChatMessageResponseEventDto{
+					ConversationID: conversationID,
+					RequestID:      requestID,
+					MessageType:    "tool_result",
+					Content:        toolResult,
+					ToolCall: &dto.ToolCallDto{
+						ID:   toolCall.ID,
+						Type: toolCall.Type,
+						Function: dto.FunctionCallDto{
+							Name:      toolCall.Function.Name,
+							Arguments: toolCall.Function.Arguments,
+						},
+					},
 				}
-				if err := s.messageRepo.Create(ctx, functionCallOutputMessageObj); err != nil {
-					log.Printf("保存工具调用结果失败: %v", err)
-				}
+				eventJSON, _ = json.Marshal(event)
+				pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
 
-				// 更新消息列表
-				messages = append(messages, openai.ChatCompletionMessage{
+				// 将工具调用和结果添加到消息历史
+				messages = append(messages, al_client.ChatMessage{
 					Role:      "assistant",
-					ToolCalls: []openai.ToolCall{toolCall},
+					Content:   "",
+					ToolCalls: []al_client.ToolCall{toolCall},
 				})
-				messages = append(messages, openai.ChatCompletionMessage{
+
+				messages = append(messages, al_client.ChatMessage{
 					Role:       "tool",
 					Content:    toolResult,
 					ToolCallID: toolCall.ID,
@@ -1306,7 +1343,7 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversati
 }
 
 // callTool 调用工具
-func (s *chatAgentConversationService) callTool(ctx context.Context, agentID uuid.UUID, toolCall openai.ToolCall) (string, error) {
+func (s *chatAgentConversationService) callTool(ctx context.Context, agentID uuid.UUID, toolCall al_client.ToolCall) (string, error) {
 	toolName := toolCall.Function.Name
 	toolArgs := toolCall.Function.Arguments
 
@@ -1376,7 +1413,7 @@ func (s *chatAgentConversationService) callMcpTool(ctx context.Context, agentID 
 	if callToolErr != nil {
 		return "", fmt.Errorf("调用MCP工具失败: %w", callToolErr)
 	}
-	log.Printf("调用MCP工具: %s, 配置ID: %s, 参数: %s", toolNameItems[1], configID, toolArgs, callToolResult)
+	log.Printf("调用MCP工具: %s, 配置ID: %s, 参数: %v, 结果: %v", toolNameItems[1], configID, toolArgs, callToolResult)
 	return callToolResult.Content, nil
 }
 
@@ -1419,9 +1456,27 @@ func (s *chatAgentConversationService) getChatAgentNamingLlmConfig(ctx context.C
 	return namingLlmProvider, namingLlm, nil
 }
 
+// createAIClient 根据LLM提供商配置创建AI客户端
+func (s *chatAgentConversationService) createAIClient(llmProvider *models.ApplicationLlmProvider) (al_client.LemonAiClient, error) {
+	// 根据LLM提供商类型创建相应的AI客户端
+	switch llmProvider.Type {
+	case "openai_chat_completions_api":
+		return al_client.NewOpenAIChatCompletionsClient(llmProvider.ApiKey), nil
+	case "ollama":
+		// TODO: 实现Ollama客户端
+		return nil, fmt.Errorf("Ollama客户端尚未实现")
+	case "volcano_engine":
+		// TODO: 实现火山引擎客户端
+		return nil, fmt.Errorf("火山引擎客户端尚未实现")
+	default:
+		// 默认使用OpenAI
+		return al_client.NewOpenAIChatCompletionsClient(llmProvider.ApiKey), nil
+	}
+}
+
 // GetChatAgentMcpServerTools 获取聊天智能体启用的MCP工具列表
 // 根据chatAgentID查询启用的工具，并从MCP服务器获取最新的工具信息
-func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Context) ([]openai.Tool, error) {
+func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Context) ([]al_client.Tool, error) {
 	_, chatAgent, getContextErr := getContextInfo(ctx)
 	if getContextErr != nil {
 		return nil, fmt.Errorf("获取上下文数据失败: %w", getContextErr)
@@ -1441,7 +1496,7 @@ func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Co
 	}
 
 	if len(enabledToolIDs) == 0 {
-		return []openai.Tool{}, nil
+		return []al_client.Tool{}, nil
 	}
 
 	// 2. 根据工具ID逐个获取工具信息，并按MCP配置分组
@@ -1457,7 +1512,7 @@ func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Co
 		}
 	}
 
-	var openaiTools []openai.Tool
+	var openaiTools []al_client.Tool
 
 	// 4. 为每个MCP配置获取最新的工具信息
 	for configID, configTools := range configToolsMap {
@@ -1513,17 +1568,29 @@ func (s *chatAgentConversationService) getToolsFromMcpServer(ctx context.Context
 	return toolsResult.Tools, nil
 }
 
-// convertMcpToolToOpenAI 将MCP工具转换为OpenAI工具格式
-func (s *chatAgentConversationService) convertMcpToolToOpenAI(mcpTool mcp.Tool, configID string) openai.Tool {
+// convertMcpToolToOpenAI 将MCP工具转换为AI工具格式
+func (s *chatAgentConversationService) convertMcpToolToOpenAI(mcpTool mcp.Tool, configID string) al_client.Tool {
 	// 构建工具名称，格式为: configID_____toolName
 	toolName := fmt.Sprintf("%s_____%s", configID, mcpTool.Name)
 
-	return openai.Tool{
+	// 转换InputSchema为map[string]interface{}
+	parameters := make(map[string]interface{})
+	if mcpTool.InputSchema.Type != "" {
+		parameters["type"] = mcpTool.InputSchema.Type
+	}
+	if mcpTool.InputSchema.Properties != nil {
+		parameters["properties"] = mcpTool.InputSchema.Properties
+	}
+	if len(mcpTool.InputSchema.Required) > 0 {
+		parameters["required"] = mcpTool.InputSchema.Required
+	}
+
+	return al_client.Tool{
 		Type: "function",
-		Function: &openai.FunctionDefinition{
+		Function: &al_client.FunctionDefinition{
 			Name:        toolName,
 			Description: mcpTool.Description,
-			Parameters:  mcpTool.InputSchema,
+			Parameters:  parameters,
 		},
 	}
 }

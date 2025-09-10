@@ -2,13 +2,27 @@
 // 用于在不同层之间传递数据，确保数据格式的一致性
 package dto
 
+// ToolCallDto 工具调用DTO
+type ToolCallDto struct {
+	ID       string          `json:"id"`
+	Type     string          `json:"type"`
+	Function FunctionCallDto `json:"function"`
+}
+
+// FunctionCallDto 函数调用DTO
+type FunctionCallDto struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
 // ChatMessageResponseEventDto 聊天消息响应事件
 // 用于流式返回聊天消息更新
 type ChatMessageResponseEventDto struct {
-	ConversationID string `json:"conversation_id"` // 会话ID
-	RequestID      string `json:"request_id"`      // 请求ID
-	MessageType    string `json:"message_type"`    // 消息类型：answer answer_delta 消息回复，tool_call tool_call_processing tool_call_end 工具调用
-	Content        string `json:"content"`         // 内容：answer，内容为消息内容；当消息类型为tool_call时，内容为调用的工具名字
+	ConversationID string       `json:"conversation_id"`     // 会话ID
+	RequestID      string       `json:"request_id"`          // 请求ID
+	MessageType    string       `json:"message_type"`        // 消息类型：answer answer_delta 消息回复，tool_call tool_call_processing tool_call_end 工具调用
+	Content        string       `json:"content"`             // 内容：answer，内容为消息内容；当消息类型为tool_call时，内容为调用的工具名字
+	ToolCall       *ToolCallDto `json:"tool_call,omitempty"` // 工具调用信息
 }
 
 // ChatMessageUseToolDto 聊天消息使用工具

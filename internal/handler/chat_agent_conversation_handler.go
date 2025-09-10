@@ -57,7 +57,7 @@ func (h *ChatAgentConversationHandler) GetConversationList(c *gin.Context) {
 		return
 	}
 
-	chatAgent, ok := chatAgentValue.(*models.ChatAgent)
+	_, ok := chatAgentValue.(*models.ChatAgent)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "智能体信息类型错误"})
 		return
@@ -66,7 +66,6 @@ func (h *ChatAgentConversationHandler) GetConversationList(c *gin.Context) {
 	// 调用业务逻辑层获取会话列表
 	conversations, err := h.chatAgentConversationService.GetConversationList(
 		c.Request.Context(),
-		chatAgent.ID.String(),
 		serviceUserID,
 		lastID,
 		size,
@@ -125,7 +124,7 @@ func (h *ChatAgentConversationHandler) GetChatMessageList(c *gin.Context) {
 		return
 	}
 
-	chatAgent, ok := chatAgentValue.(*models.ChatAgent)
+	_, ok := chatAgentValue.(*models.ChatAgent)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "智能体信息类型错误"})
 		return
@@ -134,7 +133,6 @@ func (h *ChatAgentConversationHandler) GetChatMessageList(c *gin.Context) {
 	// 调用业务逻辑层获取消息列表
 	messages, err := h.chatAgentConversationService.GetChatMessageList(
 		c.Request.Context(),
-		chatAgent.ID.String(),
 		conversationID,
 		lastID,
 		size,
@@ -429,7 +427,7 @@ func (h *ChatAgentConversationHandler) UploadAttachment(c *gin.Context) {
 		return
 	}
 
-	chatAgent, ok := chatAgentValue.(*models.ChatAgent)
+	_, ok := chatAgentValue.(*models.ChatAgent)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "智能体信息类型错误"})
 		return
@@ -446,7 +444,6 @@ func (h *ChatAgentConversationHandler) UploadAttachment(c *gin.Context) {
 	// 调用业务逻辑层上传附件
 	result, err := h.chatAgentConversationService.UploadAttachment(
 		c.Request.Context(),
-		chatAgent.ID.String(),
 		src,
 		file.Filename,
 		file.Size,
@@ -482,7 +479,7 @@ func (h *ChatAgentConversationHandler) DeleteConversation(c *gin.Context) {
 		return
 	}
 
-	chatAgent, ok := chatAgentValue.(*models.ChatAgent)
+	_, ok := chatAgentValue.(*models.ChatAgent)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "智能体信息类型错误"})
 		return
@@ -491,7 +488,6 @@ func (h *ChatAgentConversationHandler) DeleteConversation(c *gin.Context) {
 	// 调用业务逻辑层删除会话
 	result, err := h.chatAgentConversationService.DeleteConversation(
 		c.Request.Context(),
-		chatAgent.ID.String(),
 		serviceUserID,
 		conversationID,
 	)
@@ -532,7 +528,7 @@ func (h *ChatAgentConversationHandler) RenameConversationTitle(c *gin.Context) {
 		return
 	}
 
-	chatAgent, ok := chatAgentValue.(*models.ChatAgent)
+	_, ok := chatAgentValue.(*models.ChatAgent)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "智能体信息类型错误"})
 		return
@@ -541,7 +537,6 @@ func (h *ChatAgentConversationHandler) RenameConversationTitle(c *gin.Context) {
 	// 调用业务逻辑层重命名会话
 	result, err := h.chatAgentConversationService.RenameConversationTitle(
 		c.Request.Context(),
-		chatAgent.ID.String(),
 		serviceUserID,
 		conversationID,
 		newTitle,
