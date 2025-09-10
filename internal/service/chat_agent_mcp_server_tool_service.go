@@ -234,8 +234,3 @@ func (s *chatAgentMcpServerToolService) GetChatAgentAvailableMcpServerTools(ctx 
 
 	return result, nil
 }
-
-func (s *chatAgentMcpServerToolService) CallTool(ctx context.Context, mcpServerConfigID string, toolName, toolArgs string) (string, error) {
-	// TODO: 实现MCP工具调用逻辑
-	return "", fmt.Errorf("CallTool方法尚未实现")
-}
