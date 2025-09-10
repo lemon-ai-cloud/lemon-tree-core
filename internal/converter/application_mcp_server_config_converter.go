@@ -17,6 +17,7 @@ func ApplicationMcpServerConfigModelToApplicationMcpServerConfigDto(model *model
 	return dto.ApplicationMcpServerConfigDto{
 		ID:                   model.ID.String(),
 		ApplicationID:        model.ApplicationID.String(),
+		ConfigID:             model.ConfigID,
 		Name:                 model.Name,
 		Description:          model.Description,
 		Version:              model.Version,
@@ -49,8 +50,11 @@ func ApplicationMcpServerConfigModelListToApplicationMcpServerConfigDtoList(mode
 // 参数：request - 保存请求
 // 返回：数据库模型
 func SaveApplicationMcpServerConfigRequestToApplicationMcpServerConfigModel(request *dto.SaveApplicationMcpServerConfigRequest) *models.ApplicationMcpServerConfig {
+	applicationID, _ := uuid.Parse(request.ApplicationID)
 	model := &models.ApplicationMcpServerConfig{
 		Name:                 request.Name,
+		ApplicationID:        applicationID,
+		ConfigID:             request.ConfigID,
 		Description:          request.Description,
 		Version:              request.Version,
 		McpServerConnectType: request.McpServerConnectType,

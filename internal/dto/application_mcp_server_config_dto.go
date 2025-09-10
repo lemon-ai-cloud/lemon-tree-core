@@ -7,6 +7,7 @@ package dto
 type ApplicationMcpServerConfigDto struct {
 	ID                   string `json:"id"`                      // 主键ID
 	ApplicationID        string `json:"application_id"`          // 所属应用ID
+	ConfigID             string `json:"config_id"`               // 配置ID
 	Name                 string `json:"name"`                    // 名称
 	Description          string `json:"description"`             // 描述
 	Version              string `json:"version"`                 // 版本
@@ -26,6 +27,7 @@ type ApplicationMcpServerConfigDto struct {
 type SaveApplicationMcpServerConfigRequest struct {
 	ID                   *string `json:"id,omitempty"`            // 主键ID，为空时新增，有值时更新
 	ApplicationID        string  `json:"application_id"`          // 所属应用ID
+	ConfigID             string  `json:"config_id"`               // 配置ID
 	Name                 string  `json:"name"`                    // 名称
 	Description          string  `json:"description"`             // 描述
 	Version              string  `json:"version"`                 // 版本

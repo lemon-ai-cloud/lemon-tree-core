@@ -10,6 +10,7 @@ import (
 // ApplicationMcpServerConfig 应用mcp配置
 type ApplicationMcpServerConfig struct {
 	base.BaseModel           // 继承基础模型，包含 ID、时间戳等通用字段
+	ConfigID       string    `json:"config_id" gorm:"type:varchar(64);not null;comment:配置ID"`
 	ApplicationID  uuid.UUID `json:"application_id" gorm:"type:char(36);not null;comment:所属应用ID"`
 	Name           string    `json:"name" gorm:"type:varchar(64);not null;comment:名称"`
 	Description    string    `json:"description" gorm:"type:varchar(512);not null;comment:描述"`

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/repository"
+	"lemon-tree-core/internal/utils"
 	"log"
 
 	"github.com/google/uuid"
@@ -68,6 +69,8 @@ func (s *applicationMcpServerConfigService) SaveApplicationMcpServerConfig(ctx c
 	if config.ID == uuid.Nil {
 		// 新增：生成新的UUID
 		config.ID = uuid.New()
+		shortID, _ := utils.ShortUUID(config.ID.String())
+		config.ConfigID = shortID
 		return s.applicationMcpServerConfigRepo.Create(ctx, config)
 	} else {
 		// 更新：检查记录是否存在
@@ -77,6 +80,10 @@ func (s *applicationMcpServerConfigService) SaveApplicationMcpServerConfig(ctx c
 		}
 		if existing == nil {
 			return fmt.Errorf("MCP配置不存在")
+		}
+		if config.ConfigID == "" {
+			shortID, _ := utils.ShortUUID(config.ID.String())
+			config.ConfigID = shortID
 		}
 		return s.applicationMcpServerConfigRepo.Update(ctx, config)
 	}

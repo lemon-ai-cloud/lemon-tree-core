@@ -11,6 +11,7 @@ import (
 	"lemon-tree-core/internal/dto"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/repository"
+	"lemon-tree-core/internal/utils"
 	"log"
 	"os"
 	"path/filepath"
@@ -1446,7 +1447,8 @@ func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Co
 		// 为每个启用的工具创建OpenAI工具格式
 		for _, tool := range configTools {
 			if mcpTool, exists := mcpToolsMap[tool.Name]; exists {
-				openaiTool := s.convertMcpToolToOpenAI(mcpTool, configID)
+				configShortID, _ := utils.ShortUUID(configID.String())
+				openaiTool := s.convertMcpToolToOpenAI(mcpTool, configShortID)
 				openaiTools = append(openaiTools, openaiTool)
 			}
 		}
@@ -1519,24 +1521,24 @@ func (s *chatAgentConversationService) getToolsFromMcpServer(ctx context.Context
 }
 
 // convertMcpToolToOpenAI 将MCP工具转换为OpenAI工具格式
-func (s *chatAgentConversationService) convertMcpToolToOpenAI(mcpTool mcp.Tool, configID uuid.UUID) openai.Tool {
+func (s *chatAgentConversationService) convertMcpToolToOpenAI(mcpTool mcp.Tool, configID string) openai.Tool {
 	// 构建工具名称，格式为: configID_____toolName
-	toolName := fmt.Sprintf("%s_____%s", configID.String(), mcpTool.Name)
+	toolName := fmt.Sprintf("%s_____%s", configID, mcpTool.Name)
 
 	// 转换输入参数schema
-	var parameters map[string]interface{}
-	if mcpTool.InputSchema.Properties != nil {
-		parameters = mcpTool.InputSchema.Properties
-	} else {
-		parameters = make(map[string]interface{})
-	}
+	//var parameters map[string]interface{}
+	//if mcpTool.InputSchema.Properties != nil {
+	//	parameters = mcpTool.InputSchema.Properties
+	//} else {
+	//	parameters = make(map[string]interface{})
+	//}
 
 	return openai.Tool{
 		Type: "function",
 		Function: &openai.FunctionDefinition{
 			Name:        toolName,
 			Description: mcpTool.Description,
-			Parameters:  parameters,
+			Parameters:  mcpTool.InputSchema,
 		},
 	}
 }
