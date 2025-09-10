@@ -9,6 +9,7 @@ import (
 	"io"
 	"lemon-tree-core/internal/define"
 	"lemon-tree-core/internal/dto"
+	"lemon-tree-core/internal/manager"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/repository"
 	"lemon-tree-core/internal/utils"
@@ -18,8 +19,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/mark3labs/mcp-go/client"
-	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sashabaranov/go-openai"
 	"gorm.io/gorm"
@@ -29,16 +28,16 @@ import (
 // 定义 聊天会话 相关的业务逻辑方法
 type ChatAgentConversationService interface {
 	// GetChatMessageList 获取聊天消息列表
-	GetChatMessageList(ctx context.Context, chatAgentID, conversationID, lastID string, size int) ([]*models.ChatAgentMessage, error)
+	GetChatMessageList(ctx context.Context, conversationID, lastID string, size int) ([]*models.ChatAgentMessage, error)
 
 	// CreateConversation 创建会话
 	CreateConversation(ctx context.Context, serviceUserID, userMessage string) (*models.ChatAgentConversation, error)
 
 	// GetConversationList 获取会话列表
-	GetConversationList(ctx context.Context, chatAgentID, serviceUserID, lastID string, size int) ([]*models.ChatAgentConversation, error)
+	GetConversationList(ctx context.Context, serviceUserID, lastID string, size int) ([]*models.ChatAgentConversation, error)
 
 	// DeleteConversation 删除会话
-	DeleteConversation(ctx context.Context, chatAgentID, serviceUserID, conversationID string) (*dto.DeleteConversationResponse, error)
+	DeleteConversation(ctx context.Context, serviceUserID, conversationID string) (*dto.DeleteConversationResponse, error)
 
 	// UserSendMessagePredefinedAnswer 用户发送消息，返回固定答案
 	UserSendMessagePredefinedAnswer(ctx context.Context, req *dto.ChatUserSendMessageRequest, streamable bool) (io.Reader, error)
@@ -47,14 +46,14 @@ type ChatAgentConversationService interface {
 	UserSendMessage(ctx context.Context, req *dto.ChatUserSendMessageRequest, streamable bool) (io.Reader, error)
 
 	// UploadAttachment 上传聊天附件
-	UploadAttachment(ctx context.Context, chatAgentID string, file io.Reader, filename string, size int64) (*dto.UploadAttachmentResponse, error)
+	UploadAttachment(ctx context.Context, file io.Reader, filename string, size int64) (*dto.UploadAttachmentResponse, error)
 
 	// RenameConversationTitle 重命名会话标题
-	RenameConversationTitle(ctx context.Context, chatAgentID, serviceUserID, conversationID, newTitle string) (*dto.RenameConversationResponse, error)
+	RenameConversationTitle(ctx context.Context, serviceUserID, conversationID, newTitle string) (*dto.RenameConversationResponse, error)
 
 	// GetChatAgentMcpServerTools 获取聊天智能体启用的MCP工具列表
 	// 根据chatAgentID查询启用的工具，并从MCP服务器获取最新的工具信息
-	GetChatAgentMcpServerTools(ctx context.Context, chatAgentID uuid.UUID) ([]openai.Tool, error)
+	GetChatAgentMcpServerTools(ctx context.Context) ([]openai.Tool, error)
 }
 
 // chatAgentConversationService 聊天会话 业务逻辑层实现
@@ -104,8 +103,8 @@ func NewChatAgentConversationService(
 }
 
 // GetChatMessageList 获取聊天消息列表
-func (s *chatAgentConversationService) GetChatMessageList(ctx context.Context, chatAgentID, conversationID, lastID string, size int) ([]*models.ChatAgentMessage, error) {
-	agentID, err := uuid.Parse(chatAgentID)
+func (s *chatAgentConversationService) GetChatMessageList(ctx context.Context, conversationID, lastID string, size int) ([]*models.ChatAgentMessage, error) {
+	_, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("无效的智能体ID: %w", err)
 	}
@@ -116,7 +115,7 @@ func (s *chatAgentConversationService) GetChatMessageList(ctx context.Context, c
 	}
 
 	// 构建查询条件
-	query := s.db.Where("chat_agent_id = ? AND conversation_id = ? AND deleted_at IS NULL", agentID, convID)
+	query := s.db.Where("chat_agent_id = ? AND conversation_id = ? AND deleted_at IS NULL", chatAgent.ID, convID)
 
 	// 处理游标分页
 	if lastID != "" {
@@ -151,7 +150,7 @@ func (s *chatAgentConversationService) GetChatMessageList(ctx context.Context, c
 // CreateConversation 创建会话
 func (s *chatAgentConversationService) CreateConversation(ctx context.Context, serviceUserID, userMessage string) (*models.ChatAgentConversation, error) {
 	// 从上下文中获取ApplicationID和ChatAgentID
-	appID, agentID, err := getContextInfo(ctx)
+	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取上下文信息失败: %w", err)
 	}
@@ -164,8 +163,8 @@ func (s *chatAgentConversationService) CreateConversation(ctx context.Context, s
 
 	conversation := &models.ChatAgentConversation{
 		Title:         filteredUserMessage,
-		ApplicationID: appID,
-		ChatAgentID:   agentID,
+		ApplicationID: application.ID,
+		ChatAgentID:   chatAgent.ID,
 		ServiceUserID: serviceUserID,
 	}
 
@@ -177,14 +176,14 @@ func (s *chatAgentConversationService) CreateConversation(ctx context.Context, s
 }
 
 // GetConversationList 获取会话列表
-func (s *chatAgentConversationService) GetConversationList(ctx context.Context, chatAgentID, serviceUserID, lastID string, size int) ([]*models.ChatAgentConversation, error) {
-	agentID, err := uuid.Parse(chatAgentID)
+func (s *chatAgentConversationService) GetConversationList(ctx context.Context, serviceUserID, lastID string, size int) ([]*models.ChatAgentConversation, error) {
+	_, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("无效的智能体ID: %w", err)
 	}
 
 	// 构建查询条件
-	query := s.db.Where("chat_agent_id = ? AND service_user_id = ? AND deleted_at IS NULL", agentID, serviceUserID)
+	query := s.db.Where("chat_agent_id = ? AND service_user_id = ? AND deleted_at IS NULL", chatAgent.ID, serviceUserID)
 
 	// 处理游标分页
 	if lastID != "" {
@@ -217,8 +216,8 @@ func (s *chatAgentConversationService) GetConversationList(ctx context.Context, 
 }
 
 // DeleteConversation 删除会话
-func (s *chatAgentConversationService) DeleteConversation(ctx context.Context, chatAgentID, serviceUserID, conversationID string) (*dto.DeleteConversationResponse, error) {
-	agentID, err := uuid.Parse(chatAgentID)
+func (s *chatAgentConversationService) DeleteConversation(ctx context.Context, serviceUserID, conversationID string) (*dto.DeleteConversationResponse, error) {
+	_, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return &dto.DeleteConversationResponse{
 			Success: false,
@@ -243,7 +242,7 @@ func (s *chatAgentConversationService) DeleteConversation(ctx context.Context, c
 		}, nil
 	}
 
-	if conversation.ChatAgentID != agentID || conversation.ServiceUserID != serviceUserID {
+	if conversation.ChatAgentID != chatAgent.ID || conversation.ServiceUserID != serviceUserID {
 		return &dto.DeleteConversationResponse{
 			Success: false,
 			Error:   stringPtr("无权删除此会话"),
@@ -252,7 +251,7 @@ func (s *chatAgentConversationService) DeleteConversation(ctx context.Context, c
 
 	// 2. 删除会话相关的所有消息
 	var messages []*models.ChatAgentMessage
-	if err := s.db.Where("chat_agent_id = ? AND conversation_id = ?", agentID, convID).Find(&messages).Error; err != nil {
+	if err := s.db.Where("chat_agent_id = ? AND conversation_id = ?", chatAgent.ID, convID).Find(&messages).Error; err != nil {
 		return &dto.DeleteConversationResponse{
 			Success: false,
 			Error:   stringPtr(fmt.Sprintf("查询消息失败: %v", err)),
@@ -275,7 +274,7 @@ func (s *chatAgentConversationService) DeleteConversation(ctx context.Context, c
 	// 3. 删除会话相关的所有附件
 	var attachments []*models.ChatAgentAttachment
 	if len(messageIDs) > 0 {
-		if err := s.db.Where("chat_agent_id = ? AND message_id IN ?", agentID, messageIDs).Find(&attachments).Error; err != nil {
+		if err := s.db.Where("chat_agent_id = ? AND message_id IN ?", chatAgent.ID, messageIDs).Find(&attachments).Error; err != nil {
 			log.Printf("查询附件失败: %v", err)
 		} else {
 			// 删除附件文件和目录
@@ -315,7 +314,7 @@ func (s *chatAgentConversationService) DeleteConversation(ctx context.Context, c
 // UserSendMessagePredefinedAnswer 用户发送消息，返回固定答案
 func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx context.Context, req *dto.ChatUserSendMessageRequest, streamable bool) (io.Reader, error) {
 	// 从上下文中获取ApplicationID和ChatAgentID
-	appID, agentID, err := getContextInfo(ctx)
+	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取上下文信息失败: %w", err)
 	}
@@ -350,7 +349,7 @@ func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx conte
 		} else {
 			conversationIDStr = *req.ConversationID
 			// 是历史会话，查询历史消息
-			messageList, err := s.GetChatMessageList(ctx, agentID.String(), conversationIDStr, "", 100)
+			messageList, err := s.GetChatMessageList(ctx, conversationIDStr, "", 100)
 			if err != nil {
 				return nil, fmt.Errorf("获取历史消息失败: %w", err)
 			}
@@ -377,8 +376,8 @@ func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx conte
 
 	// 将用户的消息存储到数据库
 	userMessageObj := &models.ChatAgentMessage{
-		ApplicationID:  appID,
-		ChatAgentID:    agentID,
+		ApplicationID:  application.ID,
+		ChatAgentID:    chatAgent.ID,
 		ConversationID: conversation.ID,
 		RequestID:      requestID,
 		Type:           "message",
@@ -391,8 +390,8 @@ func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx conte
 
 	// 将预制的系统回复答案消息存储到数据库
 	assistantMessageObj := &models.ChatAgentMessage{
-		ApplicationID:  appID,
-		ChatAgentID:    agentID,
+		ApplicationID:  application.ID,
+		ChatAgentID:    chatAgent.ID,
 		ConversationID: conversation.ID,
 		RequestID:      requestID,
 		Type:           "message",
@@ -449,7 +448,7 @@ func (s *chatAgentConversationService) UserSendMessagePredefinedAnswer(ctx conte
 // UserSendMessage 用户发送消息
 func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req *dto.ChatUserSendMessageRequest, streamable bool) (io.Reader, error) {
 	// 从上下文中获取ApplicationID和ChatAgentID
-	appID, agentID, err := getContextInfo(ctx)
+	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取上下文信息失败: %w", err)
 	}
@@ -484,7 +483,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 		} else {
 			conversationIDStr = *req.ConversationID
 			// 是历史会话，查询历史消息
-			messageList, err := s.GetChatMessageList(ctx, agentID.String(), conversationIDStr, "", 100)
+			messageList, err := s.GetChatMessageList(ctx, conversationIDStr, "", 100)
 			if err != nil {
 				return nil, fmt.Errorf("获取历史消息失败: %w", err)
 			}
@@ -505,7 +504,7 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 	}
 
 	// 准备工具列表
-	openaiToolsList, err := s.prepareToolsList(ctx, agentID, req.UsedMcpToolList, req.UsedInternalToolList)
+	openaiToolsList, err := s.prepareToolsList(ctx, req.UsedMcpToolList, req.UsedInternalToolList)
 	if err != nil {
 		log.Printf("获取工具列表失败: %v", err)
 		// 工具获取失败不影响主流程，使用空工具列表
@@ -517,8 +516,8 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 
 	// 将用户的消息存储到数据库
 	userMessageObj := &models.ChatAgentMessage{
-		ApplicationID:  appID,
-		ChatAgentID:    agentID,
+		ApplicationID:  application.ID,
+		ChatAgentID:    chatAgent.ID,
 		ConversationID: conversation.ID,
 		RequestID:      requestID,
 		Type:           "message",
@@ -568,16 +567,16 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 
 	// 交给AI处理消息
 	if streamable {
-		return s.aiProcessStreamable(ctx, appID, agentID, conversationIDStr, requestID, messages, openaiToolsList) //openaiToolsList)
+		return s.aiProcessStreamable(ctx, conversationIDStr, requestID, messages, openaiToolsList) //openaiToolsList)
 	} else {
-		return s.aiProcess(ctx, agentID, conversationIDStr, requestID, messages, openaiToolsList)
+		return s.aiProcess(ctx, conversationIDStr, requestID, messages, openaiToolsList)
 	}
 }
 
 // UploadAttachment 上传聊天附件
-func (s *chatAgentConversationService) UploadAttachment(ctx context.Context, chatAgentID string, file io.Reader, filename string, size int64) (*dto.UploadAttachmentResponse, error) {
+func (s *chatAgentConversationService) UploadAttachment(ctx context.Context, file io.Reader, filename string, size int64) (*dto.UploadAttachmentResponse, error) {
 	// 从上下文中获取ApplicationID和ChatAgentID
-	appID, agentID, err := getContextInfo(ctx)
+	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return &dto.UploadAttachmentResponse{
 			Success: false,
@@ -644,8 +643,8 @@ func (s *chatAgentConversationService) UploadAttachment(ctx context.Context, cha
 
 	// 创建附件记录
 	attachment := &models.ChatAgentAttachment{
-		ApplicationID:    appID,
-		ChatAgentID:      agentID,
+		ApplicationID:    application.ID,
+		ChatAgentID:      chatAgent.ID,
 		OriginalFileName: filename,
 		FileExtension:    fileExtension,
 		FileSize:         size,
@@ -675,8 +674,8 @@ func (s *chatAgentConversationService) UploadAttachment(ctx context.Context, cha
 }
 
 // RenameConversationTitle 重命名会话标题
-func (s *chatAgentConversationService) RenameConversationTitle(ctx context.Context, chatAgentID, serviceUserID, conversationID, newTitle string) (*dto.RenameConversationResponse, error) {
-	agentID, err := uuid.Parse(chatAgentID)
+func (s *chatAgentConversationService) RenameConversationTitle(ctx context.Context, serviceUserID, conversationID, newTitle string) (*dto.RenameConversationResponse, error) {
+	_, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return &dto.RenameConversationResponse{
 			Success: false,
@@ -701,7 +700,7 @@ func (s *chatAgentConversationService) RenameConversationTitle(ctx context.Conte
 		}, nil
 	}
 
-	if conversation.ChatAgentID != agentID || conversation.ServiceUserID != serviceUserID {
+	if conversation.ChatAgentID != chatAgent.ID || conversation.ServiceUserID != serviceUserID {
 		return &dto.RenameConversationResponse{
 			Success: false,
 			Error:   stringPtr("无权重命名此会话"),
@@ -739,30 +738,30 @@ func boolPtr(b bool) *bool {
 }
 
 // getContextInfo 从上下文中获取ApplicationID和ChatAgentID
-func getContextInfo(ctx context.Context) (applicationID, chatAgentID uuid.UUID, err error) {
+func getContextInfo(ctx context.Context) (*models.Application, *models.ChatAgent, error) {
 	// 从上下文中获取ChatAgent
 	chatAgentValue := ctx.Value(define.AppContextKeyCurrentChatAgent)
 	if chatAgentValue == nil {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("上下文中未找到ChatAgent信息")
+		return nil, nil, fmt.Errorf("上下文中未找到ChatAgent信息")
 	}
 
 	chatAgent, ok := chatAgentValue.(*models.ChatAgent)
 	if !ok {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("ChatAgent类型转换失败")
+		return nil, nil, fmt.Errorf("ChatAgent类型转换失败")
 	}
 
 	// 从上下文中获取Application
 	applicationValue := ctx.Value(define.AppContextKeyCurrentApplication)
 	if applicationValue == nil {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("上下文中未找到Application信息")
+		return nil, nil, fmt.Errorf("上下文中未找到Application信息")
 	}
 
 	application, ok := applicationValue.(*models.Application)
 	if !ok {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("Application类型转换失败")
+		return nil, nil, fmt.Errorf("Application类型转换失败")
 	}
 
-	return application.ID, chatAgent.ID, nil
+	return application, chatAgent, nil
 }
 
 func isDocumentFile(ext string) bool {
@@ -810,11 +809,12 @@ func getMimeType(ext string) string {
 }
 
 // prepareToolsList 准备工具列表
-func (s *chatAgentConversationService) prepareToolsList(ctx context.Context, chatAgentID uuid.UUID, usedMcpToolList []dto.ChatMessageUseToolDto, usedInternalToolList []string) ([]openai.Tool, error) {
+func (s *chatAgentConversationService) prepareToolsList(ctx context.Context, usedMcpToolList []dto.ChatMessageUseToolDto, usedInternalToolList []string) ([]openai.Tool, error) {
+	//_, chatAgent, err := getContextInfo(ctx)
 	var openaiToolsList []openai.Tool
 
 	// 处理MCP工具
-	mcpTools, err := s.GetChatAgentMcpServerTools(ctx, chatAgentID)
+	mcpTools, err := s.GetChatAgentMcpServerTools(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -883,9 +883,9 @@ func (s *chatAgentConversationService) processMessageAttachments(ctx context.Con
 }
 
 // aiProcessStreamable 处理AI消息 - 流式调用AI
-func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, applicationID, chatAgentID uuid.UUID, conversationID, requestID string, messages []openai.ChatCompletionMessage, aiTools []openai.Tool) (io.Reader, error) {
+func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, conversationID, requestID string, messages []openai.ChatCompletionMessage, aiTools []openai.Tool) (io.Reader, error) {
 	// 从上下文中获取ChatAgentID
-	_, agentID, err := getContextInfo(ctx)
+	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取上下文信息失败: %w", err)
 	}
@@ -896,7 +896,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 		defer pw.Close()
 
 		// 获取应用配置和OpenAI客户端
-		llmProvider, llm, err := s.getChatAgentChatLlmConfig(ctx, chatAgentID)
+		llmProvider, llm, err := s.getChatAgentChatLlmConfig(ctx)
 		if err != nil {
 			event := dto.ChatMessageResponseEventDto{
 				ConversationID: conversationID,
@@ -1008,8 +1008,8 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 				if choice.FinishReason == "stop" {
 					// 生成最终消息并保存到数据库
 					finalAssistantMessageObj := &models.ChatAgentMessage{
-						ApplicationID:  applicationID,
-						ChatAgentID:    agentID,
+						ApplicationID:  application.ID,
+						ChatAgentID:    chatAgent.ID,
 						ConversationID: uuid.MustParse(conversationID),
 						RequestID:      requestID,
 						Type:           "message",
@@ -1052,8 +1052,8 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 
 			// 保存工具调用消息到数据库
 			functionCallMessageObj := &models.ChatAgentMessage{
-				ApplicationID:         applicationID,
-				ChatAgentID:           agentID,
+				ApplicationID:         application.ID,
+				ChatAgentID:           chatAgent.ID,
 				ConversationID:        uuid.MustParse(conversationID),
 				RequestID:             requestID,
 				Type:                  "function_call",
@@ -1076,7 +1076,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 			pw.Write([]byte(fmt.Sprintf("data: %s\n\n", eventJSON)))
 
 			// 调用工具
-			toolResult, err := s.callTool(ctx, applicationID, toolCall)
+			toolResult, err := s.callTool(ctx, chatAgent.ID, toolCall)
 			if err != nil {
 				log.Printf("调用工具失败: %v", err)
 				toolResult = "调用工具失败"
@@ -1084,8 +1084,8 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 
 			// 保存工具调用结果到数据库
 			functionCallOutputMessageObj := &models.ChatAgentMessage{
-				ApplicationID:      applicationID,
-				ChatAgentID:        agentID,
+				ApplicationID:      application.ID,
+				ChatAgentID:        chatAgent.ID,
 				ConversationID:     uuid.MustParse(conversationID),
 				RequestID:          requestID,
 				Type:               "function_call_output",
@@ -1122,7 +1122,7 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 		// 如果需要继续AI处理
 		if isNeedAiProcessContinue {
 			// 递归调用AI处理
-			recursiveReader, err := s.aiProcessStreamable(ctx, applicationID, chatAgentID, conversationID, requestID, messages, aiTools)
+			recursiveReader, err := s.aiProcessStreamable(ctx, conversationID, requestID, messages, aiTools)
 			if err != nil {
 				event := dto.ChatMessageResponseEventDto{
 					ConversationID: conversationID,
@@ -1144,9 +1144,9 @@ func (s *chatAgentConversationService) aiProcessStreamable(ctx context.Context, 
 }
 
 // aiProcess 处理AI消息 - 非流式调用AI
-func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicationID uuid.UUID, conversationID, requestID string, messages []openai.ChatCompletionMessage, aiTools []openai.Tool) (io.Reader, error) {
+func (s *chatAgentConversationService) aiProcess(ctx context.Context, conversationID, requestID string, messages []openai.ChatCompletionMessage, aiTools []openai.Tool) (io.Reader, error) {
 	// 从上下文中获取ChatAgentID
-	_, agentID, err := getContextInfo(ctx)
+	application, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取上下文信息失败: %w", err)
 	}
@@ -1157,7 +1157,7 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 		defer pw.Close()
 
 		// 获取应用配置和OpenAI客户端
-		llmProvider, llm, err := s.getChatAgentChatLlmConfig(ctx, applicationID)
+		llmProvider, llm, err := s.getChatAgentChatLlmConfig(ctx)
 		if err != nil {
 			event := dto.ChatMessageResponseEventDto{
 				ConversationID: conversationID,
@@ -1208,8 +1208,8 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 
 				// 保存工具调用消息到数据库
 				functionCallMessageObj := &models.ChatAgentMessage{
-					ApplicationID:         applicationID,
-					ChatAgentID:           agentID,
+					ApplicationID:         application.ID,
+					ChatAgentID:           chatAgent.ID,
 					ConversationID:        uuid.MustParse(conversationID),
 					RequestID:             requestID,
 					Type:                  "function_call",
@@ -1222,7 +1222,7 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 				}
 
 				// 调用工具
-				toolResult, err := s.callTool(ctx, applicationID, toolCall)
+				toolResult, err := s.callTool(ctx, chatAgent.ID, toolCall)
 				if err != nil {
 					log.Printf("调用工具失败: %v", err)
 					toolResult = "调用工具失败"
@@ -1230,8 +1230,8 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 
 				// 保存工具调用结果到数据库
 				functionCallOutputMessageObj := &models.ChatAgentMessage{
-					ApplicationID:      applicationID,
-					ChatAgentID:        agentID,
+					ApplicationID:      application.ID,
+					ChatAgentID:        chatAgent.ID,
 					ConversationID:     uuid.MustParse(conversationID),
 					RequestID:          requestID,
 					Type:               "function_call_output",
@@ -1259,7 +1259,7 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 		// 如果需要继续AI处理
 		if isNeedAiProcessContinue {
 			// 递归调用AI处理
-			recursiveReader, err := s.aiProcess(ctx, applicationID, conversationID, requestID, messages, aiTools)
+			recursiveReader, err := s.aiProcess(ctx, conversationID, requestID, messages, aiTools)
 			if err != nil {
 				event := dto.ChatMessageResponseEventDto{
 					ConversationID: conversationID,
@@ -1277,8 +1277,8 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 		} else {
 			// 有最终消息，无需调用工具
 			assistantMessageObj := &models.ChatAgentMessage{
-				ApplicationID:  applicationID,
-				ChatAgentID:    agentID,
+				ApplicationID:  application.ID,
+				ChatAgentID:    chatAgent.ID,
 				ConversationID: uuid.MustParse(conversationID),
 				RequestID:      requestID,
 				Type:           "message",
@@ -1306,22 +1306,41 @@ func (s *chatAgentConversationService) aiProcess(ctx context.Context, applicatio
 }
 
 // callTool 调用工具
-func (s *chatAgentConversationService) callTool(ctx context.Context, applicationID uuid.UUID, toolCall openai.ToolCall) (string, error) {
+func (s *chatAgentConversationService) callTool(ctx context.Context, agentID uuid.UUID, toolCall openai.ToolCall) (string, error) {
 	toolName := toolCall.Function.Name
 	toolArgs := toolCall.Function.Arguments
 
+	var toolCallParams map[string]interface{}
+
+	// 解析 JSON
+	err := json.Unmarshal([]byte(toolArgs), &toolCallParams)
+	if err != nil {
+		fmt.Println("解析 JSON 出错:", err)
+		return "", err
+	}
+	var callToolResult any
+	var callToolErr error
 	// 判断是否为内部工具
 	if strings.HasPrefix(toolName, "__lai__") {
 		// 调用内部工具
-		return s.callInternalTool(ctx, applicationID, toolName, toolArgs)
+		callToolResult, callToolErr = s.callInternalTool(ctx, agentID, toolName, toolCallParams)
 	} else {
 		// 调用MCP工具
-		return s.callMcpTool(ctx, applicationID, toolName, toolArgs)
+		callToolResult, callToolErr = s.callMcpTool(ctx, agentID, toolName, toolCallParams)
 	}
+	if callToolErr != nil {
+		return "", callToolErr
+	}
+	jsonBytes, marshalJsonErr := json.Marshal(callToolResult)
+	if marshalJsonErr != nil {
+		fmt.Println("转换 JSON 出错:", err)
+		return "", marshalJsonErr
+	}
+	return string(jsonBytes), nil
 }
 
 // callInternalTool 调用内部工具
-func (s *chatAgentConversationService) callInternalTool(ctx context.Context, applicationID uuid.UUID, toolName, toolArgs string) (string, error) {
+func (s *chatAgentConversationService) callInternalTool(ctx context.Context, agentID uuid.UUID, toolName string, toolArgs map[string]interface{}) (string, error) {
 	// 这里需要根据实际的内部工具实现来调用
 	// 暂时返回一个简单的实现
 	log.Printf("调用内部工具: %s, 参数: %s", toolName, toolArgs)
@@ -1329,27 +1348,41 @@ func (s *chatAgentConversationService) callInternalTool(ctx context.Context, app
 }
 
 // callMcpTool 调用MCP工具
-func (s *chatAgentConversationService) callMcpTool(ctx context.Context, applicationID uuid.UUID, toolName, toolArgs string) (string, error) {
+func (s *chatAgentConversationService) callMcpTool(ctx context.Context, agentID uuid.UUID, toolName string, toolArgs map[string]interface{}) (any, error) {
 	// 解析工具名称，格式为: configID_____toolName
 	toolNameItems := strings.Split(toolName, "_____")
 	if len(toolNameItems) != 2 {
 		return "", fmt.Errorf("无效的工具名称格式: %s", toolName)
 	}
 
-	configID, err := uuid.Parse(toolNameItems[0])
-	if err != nil {
-		return "", fmt.Errorf("无效的MCP配置ID: %s", toolNameItems[0])
-	}
+	configID := toolNameItems[0]
 
 	// 这里需要根据实际的MCP客户端实现来调用
 	// 暂时返回一个简单的实现
-	log.Printf("调用MCP工具: %s, 配置ID: %s, 参数: %s", toolNameItems[1], configID, toolArgs)
-	return "MCP工具调用结果", nil
+	mcpServerConfig, getMcpServerConfigErr := s.mcpConfigRepo.GetByConfigID(ctx, configID)
+	if getMcpServerConfigErr != nil {
+		return "", fmt.Errorf("获取MCP配置失败: %w", getMcpServerConfigErr)
+	}
+	mcpClient, getMcpClientError := manager.GetMcpClient(ctx, mcpServerConfig)
+	if getMcpClientError != nil {
+		return "", fmt.Errorf("创建MCP客户端失败: %w", getMcpClientError)
+	}
+	callToolResult, callToolErr := mcpClient.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      toolNameItems[1],
+			Arguments: toolArgs,
+		},
+	})
+	if callToolErr != nil {
+		return "", fmt.Errorf("调用MCP工具失败: %w", callToolErr)
+	}
+	log.Printf("调用MCP工具: %s, 配置ID: %s, 参数: %s", toolNameItems[1], configID, toolArgs, callToolResult)
+	return callToolResult.Content, nil
 }
 
-func (s *chatAgentConversationService) getChatAgentChatLlmConfig(ctx context.Context, chatAgentID uuid.UUID) (llmProvider *models.ApplicationLlmProvider, chatModel *models.ApplicationLlm, err error) {
+func (s *chatAgentConversationService) getChatAgentChatLlmConfig(ctx context.Context) (llmProvider *models.ApplicationLlmProvider, chatModel *models.ApplicationLlm, err error) {
 	// 获取应用的LLM配置
-	chatAgent, err := s.chatAgentRepo.GetByID(ctx, chatAgentID)
+	_, chatAgent, err := getContextInfo(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("获取应用Agent LLM配置失败: %w", err)
 	}
@@ -1366,9 +1399,9 @@ func (s *chatAgentConversationService) getChatAgentChatLlmConfig(ctx context.Con
 
 	return chatLlmProvider, chatLlm, nil
 }
-func (s *chatAgentConversationService) getChatAgentNamingLlmConfig(ctx context.Context, chatAgentID uuid.UUID) (llmProvider *models.ApplicationLlmProvider, chatModel *models.ApplicationLlm, err error) {
+func (s *chatAgentConversationService) getChatAgentNamingLlmConfig(ctx context.Context) (llmProvider *models.ApplicationLlmProvider, chatModel *models.ApplicationLlm, err error) {
+	_, chatAgent, err := getContextInfo(ctx)
 	// 获取应用的LLM配置
-	chatAgent, err := s.chatAgentRepo.GetByID(ctx, chatAgentID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("获取应用Agent LLM配置失败: %w", err)
 	}
@@ -1388,9 +1421,13 @@ func (s *chatAgentConversationService) getChatAgentNamingLlmConfig(ctx context.C
 
 // GetChatAgentMcpServerTools 获取聊天智能体启用的MCP工具列表
 // 根据chatAgentID查询启用的工具，并从MCP服务器获取最新的工具信息
-func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Context, chatAgentID uuid.UUID) ([]openai.Tool, error) {
+func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Context) ([]openai.Tool, error) {
+	_, chatAgent, getContextErr := getContextInfo(ctx)
+	if getContextErr != nil {
+		return nil, fmt.Errorf("获取上下文数据失败: %w", getContextErr)
+	}
 	// 1. 查询该聊天智能体启用的MCP工具配置
-	enabledTools, err := s.chatAgentMcpServerToolRepo.GetByChatAgentID(ctx, chatAgentID)
+	enabledTools, err := s.chatAgentMcpServerToolRepo.GetByChatAgentID(ctx, chatAgent.ID)
 	if err != nil {
 		return nil, fmt.Errorf("获取聊天智能体MCP工具配置失败: %w", err)
 	}
@@ -1459,57 +1496,13 @@ func (s *chatAgentConversationService) GetChatAgentMcpServerTools(ctx context.Co
 
 // getToolsFromMcpServer 从MCP服务器获取工具列表
 func (s *chatAgentConversationService) getToolsFromMcpServer(ctx context.Context, config *models.ApplicationMcpServerConfig) ([]mcp.Tool, error) {
-	// 根据连接方式创建MCP客户端
-	var c *client.Client
-	var err error
-
-	switch config.McpServerConnectType {
-	case "streamable-http":
-		httpTransport, err := transport.NewStreamableHTTP(config.McpServerUrl)
-		if err != nil {
-			return nil, fmt.Errorf("创建Streamable HTTP传输失败: %w", err)
-		}
-		c = client.NewClient(httpTransport)
-	case "sse":
-		sse, err := transport.NewSSE(config.McpServerUrl)
-		if err != nil {
-			return nil, fmt.Errorf("创建SSE传输失败: %w", err)
-		}
-		c = client.NewClient(sse)
-	case "stdio":
-		studio := transport.NewStdio(config.McpServerCommand, []string{config.McpServerEnv}, "")
-		c = client.NewClient(studio)
-	default:
-		return nil, fmt.Errorf("不支持的连接方式: %s", config.McpServerConnectType)
-	}
-
-	// 初始化客户端
-	initRequest := mcp.InitializeRequest{}
-	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
-	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "Lemon-Tree MCP Client",
-		Version: "1.0.0",
-	}
-	initRequest.Params.Capabilities = mcp.ClientCapabilities{}
-
-	serverInfo, err := c.Initialize(ctx, initRequest)
+	// 使用公共的MCP客户端管理器创建客户端
+	c, err := manager.GetMcpClient(ctx, config)
 	if err != nil {
-		return nil, fmt.Errorf("初始化MCP客户端失败: %w", err)
-	}
-
-	log.Printf("连接到MCP服务器: %s (版本 %s)", serverInfo.ServerInfo.Name, serverInfo.ServerInfo.Version)
-
-	// 健康检查
-	if err := c.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("MCP服务器健康检查失败: %w", err)
+		return nil, fmt.Errorf("创建MCP客户端失败: %w", err)
 	}
 
 	// 获取工具列表
-	if serverInfo.Capabilities.Tools == nil {
-		log.Println("MCP服务器不支持工具功能")
-		return []mcp.Tool{}, nil
-	}
-
 	toolsRequest := mcp.ListToolsRequest{}
 	toolsResult, err := c.ListTools(ctx, toolsRequest)
 	if err != nil {

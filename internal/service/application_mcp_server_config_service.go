@@ -5,14 +5,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"lemon-tree-core/internal/manager"
 	"lemon-tree-core/internal/models"
 	"lemon-tree-core/internal/repository"
-	"lemon-tree-core/internal/utils"
 	"log"
 
 	"github.com/google/uuid"
-	"github.com/mark3labs/mcp-go/client"
-	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -69,8 +67,6 @@ func (s *applicationMcpServerConfigService) SaveApplicationMcpServerConfig(ctx c
 	if config.ID == uuid.Nil {
 		// 新增：生成新的UUID
 		config.ID = uuid.New()
-		shortID, _ := utils.ShortUUID(config.ID.String())
-		config.ConfigID = shortID
 		return s.applicationMcpServerConfigRepo.Create(ctx, config)
 	} else {
 		// 更新：检查记录是否存在
@@ -80,10 +76,6 @@ func (s *applicationMcpServerConfigService) SaveApplicationMcpServerConfig(ctx c
 		}
 		if existing == nil {
 			return fmt.Errorf("MCP配置不存在")
-		}
-		if config.ConfigID == "" {
-			shortID, _ := utils.ShortUUID(config.ID.String())
-			config.ConfigID = shortID
 		}
 		return s.applicationMcpServerConfigRepo.Update(ctx, config)
 	}
@@ -214,55 +206,13 @@ func (s *applicationMcpServerConfigService) SyncMcpServerTools(ctx context.Conte
 
 // getToolsFromMcpClient 从HTTP/SSE客户端获取工具
 func (s *applicationMcpServerConfigService) getToolsFromMcpClient(ctx context.Context, config *models.ApplicationMcpServerConfig) ([]mcp.Tool, error) {
-	var c *client.Client
-	switch config.McpServerConnectType {
-	case "streamable-http":
-		// 创建HTTP传输
-		httpTransport, err := transport.NewStreamableHTTP(config.McpServerUrl)
-		if err != nil {
-			return nil, fmt.Errorf("创建Streamable HTTP传输失败: %w", err)
-		}
-		// 创建客户端
-		c = client.NewClient(httpTransport)
-	case "sse":
-		// 创建HTTP传输
-		sse, err := transport.NewSSE(config.McpServerUrl)
-		if err != nil {
-			return nil, fmt.Errorf("创建SSE传输失败: %w", err)
-		}
-		c = client.NewClient(sse)
-	case "studio":
-		studio := transport.NewStdio(config.McpServerCommand, []string{config.McpServerEnv}, "")
-		c = client.NewClient(studio)
-	}
-
-	// 初始化客户端
-	initRequest := mcp.InitializeRequest{}
-	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
-	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "Lemon-Tree MCP Client",
-		Version: "1.0.0",
-	}
-	initRequest.Params.Capabilities = mcp.ClientCapabilities{}
-
-	serverInfo, err := c.Initialize(ctx, initRequest)
+	// 使用公共的MCP客户端管理器创建客户端
+	c, err := manager.GetMcpClient(ctx, config)
 	if err != nil {
-		return nil, fmt.Errorf("初始化客户端失败: %w", err)
-	}
-
-	log.Printf("连接到服务器: %s (版本 %s)", serverInfo.ServerInfo.Name, serverInfo.ServerInfo.Version)
-
-	// 健康检查
-	if err := c.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("健康检查失败: %w", err)
+		return nil, fmt.Errorf("创建MCP客户端失败: %w", err)
 	}
 
 	// 获取工具列表
-	if serverInfo.Capabilities.Tools == nil {
-		log.Println("服务器不支持工具功能")
-		return []mcp.Tool{}, nil
-	}
-
 	toolsRequest := mcp.ListToolsRequest{}
 	toolsResult, err := c.ListTools(ctx, toolsRequest)
 	if err != nil {

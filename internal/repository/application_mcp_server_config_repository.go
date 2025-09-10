@@ -27,6 +27,8 @@ type ApplicationMcpServerConfigRepository interface {
 
 	// GetByApplicationID 根据应用ID获取 ApplicationMCP配置 列表
 	GetByApplicationID(ctx context.Context, applicationID uuid.UUID) ([]*models.ApplicationMcpServerConfig, error)
+
+	GetByConfigID(ctx context.Context, configID string) (*models.ApplicationMcpServerConfig, error)
 }
 
 // applicationMcpServerConfigRepository ApplicationMCP配置 数据访问层实现
@@ -92,4 +94,17 @@ func (r *applicationMcpServerConfigRepository) GetByApplicationID(ctx context.Co
 		return nil, err
 	}
 	return configs, nil
+}
+
+// GetByConfigID 根据配置ID获取 ApplicationMCP配置
+// 从数据库中查询指定配置ID的 ApplicationMCP配置
+// 参数：ctx - 上下文，configID - 配置ID
+// 返回：ApplicationMCP配置和错误信息
+func (r *applicationMcpServerConfigRepository) GetByConfigID(ctx context.Context, configID string) (*models.ApplicationMcpServerConfig, error) {
+	var config models.ApplicationMcpServerConfig
+	err := r.db.WithContext(ctx).Where("config_id = ?", configID).First(&config).Error
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
 }
