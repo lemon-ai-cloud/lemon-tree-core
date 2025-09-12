@@ -477,7 +477,6 @@ func (s *chatAgentConversationService) UserSendMessage(ctx context.Context, req 
 
 		conversation, err = s.conversationRepo.GetByID(ctx, convID)
 		if err != nil || conversation == nil {
-			// 创建新会话
 			conversation, err = s.CreateConversation(ctx, req.ServiceUserID, req.UserMessage)
 			if err != nil {
 				return nil, fmt.Errorf("创建会话失败: %w", err)

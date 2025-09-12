@@ -2,8 +2,9 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"lemon-tree-core/internal/base"
+
+	"github.com/google/uuid"
 )
 
 // ChatAgentConversation 聊天智能体的会话
