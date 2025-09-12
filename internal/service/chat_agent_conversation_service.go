@@ -115,7 +115,7 @@ func (s *chatAgentConversationService) GetChatMessageList(ctx context.Context, c
 	}
 
 	// 构建查询条件
-	query := s.db.Where("chat_agent_id = ? AND conversation_id = ? AND deleted_at IS NULL", chatAgent.ID, convID)
+	query := s.db.Where("chat_agent_id = ? AND conversation_id = ? AND type = ? AND deleted_at IS NULL", chatAgent.ID, convID, "message")
 
 	// 处理游标分页
 	if lastID != "" {
